@@ -2,113 +2,35 @@ import * as THREE from
     "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js";
 
 
-// =====================================================
-// UI
-// =====================================================
+const startButton =
+    document.getElementById("startAR");
 
-const startButton = document.getElementById("startAR");
-const status = document.getElementById("status");
+const status =
+    document.getElementById("status");
 
 
-// =====================================================
-// THREE.JS
-// =====================================================
+let session = null;
 
 let renderer = null;
+
 let scene = null;
+
 let camera = null;
 
 
 // =====================================================
-// WEBXR
+// CHECK AR
 // =====================================================
 
-let xrSession = null;
-let localReferenceSpace = null;
-let viewerSpace = null;
-let hitTestSource = null;
-
-
-// =====================================================
-// AR OBJECTS
-// =====================================================
-
-let reticle = null;
-let cube = null;
-
-
-// =====================================================
-// HIT TEST
-// =====================================================
-
-let currentHit = null;
-
-
-// =====================================================
-// HAND TRACKING
-// =====================================================
-
-let leftHand = null;
-let rightHand = null;
-
-let handJoints = [];
-
-let pinchLeft = false;
-let pinchRight = false;
-
-let leftPinchPosition = new THREE.Vector3();
-let rightPinchPosition = new THREE.Vector3();
-
-
-// =====================================================
-// OBJECT CONTROL
-// =====================================================
-
-let cubePlaced = false;
-
-let cubeGrabbed = false;
-
-let grabMode = "none";
-
-let grabOffset = new THREE.Vector3();
-
-
-// =====================================================
-// TWO-HAND SCALE
-// =====================================================
-
-let twoHandScaling = false;
-
-let scaleStartDistance = 0;
-
-let scaleStartSize = 0.20;
-
-
-// =====================================================
-// CONSTANTS
-// =====================================================
-
-const PINCH_DISTANCE = 0.035;
-
-const GRAB_DISTANCE = 0.20;
-
-const MIN_CUBE_SIZE = 0.05;
-
-const MAX_CUBE_SIZE = 0.80;
-
-
-// =====================================================
-// CHECK AR SUPPORT
-// =====================================================
-
-async function checkARSupport() {
+async function checkAR() {
 
     if (!navigator.xr) {
 
         status.textContent =
-            "❌ WebXR is not available.";
+            "WebXR is not available.";
 
-        startButton.disabled = true;
+        startButton.disabled =
+            true;
 
         return;
     }
@@ -127,14 +49,16 @@ async function checkARSupport() {
             status.textContent =
                 "🔥 AR READY";
 
-            startButton.disabled = false;
+            startButton.disabled =
+                false;
 
         } else {
 
             status.textContent =
-                "❌ AR is not supported.";
+                "AR is not supported.";
 
-            startButton.disabled = true;
+            startButton.disabled =
+                true;
         }
 
     } catch (error) {
@@ -142,9 +66,10 @@ async function checkARSupport() {
         console.error(error);
 
         status.textContent =
-            "❌ AR support check failed.";
+            "AR check failed.";
 
-        startButton.disabled = true;
+        startButton.disabled =
+            true;
     }
 }
 
@@ -155,22 +80,17 @@ async function checkARSupport() {
 
 function createScene() {
 
-    scene = new THREE.Scene();
+    scene =
+        new THREE.Scene();
 
-
-    // ---------------------------------------------
-    // Camera
-    // ---------------------------------------------
 
     camera =
         new THREE.PerspectiveCamera();
 
-    camera.matrixAutoUpdate = false;
 
+    camera.matrixAutoUpdate =
+        false;
 
-    // ---------------------------------------------
-    // Lighting
-    // ---------------------------------------------
 
     const light =
         new THREE.HemisphereLight(
@@ -179,124 +99,8 @@ function createScene() {
             3
         );
 
+
     scene.add(light);
-
-
-    // ---------------------------------------------
-    // Reticle
-    // ---------------------------------------------
-
-    const reticleGeometry =
-        new THREE.RingGeometry(
-            0.08,
-            0.11,
-            32
-        );
-
-
-    reticleGeometry.rotateX(
-        -Math.PI / 2
-    );
-
-
-    const reticleMaterial =
-        new THREE.MeshBasicMaterial({
-            color: 0x00ff00
-        });
-
-
-    reticle =
-        new THREE.Mesh(
-            reticleGeometry,
-            reticleMaterial
-        );
-
-
-    reticle.matrixAutoUpdate =
-        false;
-
-    reticle.visible =
-        false;
-
-
-    scene.add(reticle);
-
-
-    // ---------------------------------------------
-    // Cube
-    // ---------------------------------------------
-
-    const cubeGeometry =
-        new THREE.BoxGeometry(
-            0.20,
-            0.20,
-            0.20
-        );
-
-
-    const cubeMaterial =
-        new THREE.MeshStandardMaterial({
-
-            color: 0x00aaff,
-
-            roughness: 0.30,
-
-            metalness: 0.40
-        });
-
-
-    cube =
-        new THREE.Mesh(
-            cubeGeometry,
-            cubeMaterial
-        );
-
-
-    cube.visible =
-        false;
-
-
-    scene.add(cube);
-}
-
-
-// =====================================================
-// CREATE HAND VISUALIZATION
-// =====================================================
-
-function createHandVisualization() {
-
-    const jointGeometry =
-        new THREE.SphereGeometry(
-            0.008,
-            8,
-            8
-        );
-
-
-    const jointMaterial =
-        new THREE.MeshBasicMaterial({
-            color: 0xff00ff
-        });
-
-
-    for (let i = 0; i < 42; i++) {
-
-        const joint =
-            new THREE.Mesh(
-                jointGeometry,
-                jointMaterial
-            );
-
-
-        joint.visible =
-            false;
-
-
-        scene.add(joint);
-
-        handJoints.push(joint);
-    }
 }
 
 
@@ -312,18 +116,8 @@ async function startAR() {
             "Starting AR...";
 
 
-        // ---------------------------------------------
-        // Create scene
-        // ---------------------------------------------
-
         createScene();
 
-        createHandVisualization();
-
-
-        // ---------------------------------------------
-        // Renderer
-        // ---------------------------------------------
 
         renderer =
             new THREE.WebGLRenderer({
@@ -340,9 +134,7 @@ async function startAR() {
 
 
         renderer.setSize(
-
             window.innerWidth,
-
             window.innerHeight
         );
 
@@ -367,11 +159,11 @@ async function startAR() {
         );
 
 
-        // ---------------------------------------------
-        // Request AR
-        // ---------------------------------------------
+        // =================================================
+        // REQUEST HAND TRACKING AS OPTIONAL FEATURE
+        // =================================================
 
-        xrSession =
+        session =
             await navigator.xr.requestSession(
 
                 "immersive-ar",
@@ -379,129 +171,98 @@ async function startAR() {
                 {
 
                     requiredFeatures: [
-
-                        "local",
-
-                        "hit-test"
+                        "local"
                     ],
 
                     optionalFeatures: [
-
-                        "anchors",
-
                         "hand-tracking",
-
                         "dom-overlay"
                     ],
 
                     domOverlay: {
-
                         root: document.body
                     }
                 }
             );
 
 
-        // ---------------------------------------------
-        // Give session to Three.js
-        // ---------------------------------------------
-
         await renderer.xr.setSession(
-            xrSession
+            session
         );
 
-
-        // ---------------------------------------------
-        // Reference spaces
-        // ---------------------------------------------
-
-        localReferenceSpace =
-            await xrSession.requestReferenceSpace(
-                "local"
-            );
-
-
-        viewerSpace =
-            await xrSession.requestReferenceSpace(
-                "viewer"
-            );
-
-
-        // ---------------------------------------------
-        // Hit test
-        // ---------------------------------------------
-
-        hitTestSource =
-            await xrSession.requestHitTestSource({
-
-                space: viewerSpace
-            });
-
-
-        // ---------------------------------------------
-        // XR HANDS
-        // ---------------------------------------------
-
-        // Ask Three.js for the two WebXR hands.
-        // They will only become active if the browser
-        // exposes actual hand tracking.
-
-        leftHand =
-            renderer.xr.getHand(0);
-
-        rightHand =
-            renderer.xr.getHand(1);
-
-
-        scene.add(leftHand);
-        scene.add(rightHand);
-
-
-        // ---------------------------------------------
-        // Select / screen tap
-        // ---------------------------------------------
-
-        xrSession.addEventListener(
-            "select",
-            placeCube
-        );
-
-
-        // ---------------------------------------------
-        // UI
-        // ---------------------------------------------
 
         startButton.style.display =
             "none";
 
 
         status.textContent =
-            "📷 Move phone slowly to find a surface";
+            "📷 AR ACTIVE — checking hand tracking...";
 
 
-        // ---------------------------------------------
-        // XR render loop
-        // ---------------------------------------------
+        // =================================================
+        // SESSION EVENTS
+        // =================================================
 
-        renderer.setAnimationLoop(
-            renderAR
+        session.addEventListener(
+            "inputsourceschange",
+            inspectInputSources
         );
 
 
-        // ---------------------------------------------
-        // Session end
-        // ---------------------------------------------
+        // =================================================
+        // INITIAL CHECK
+        // =================================================
 
-        xrSession.addEventListener(
+        inspectInputSources();
+
+
+        // =================================================
+        // XR LOOP
+        // =================================================
+
+        renderer.setAnimationLoop(
+            render
+        );
+
+
+        // =================================================
+        // SESSION END
+        // =================================================
+
+        session.addEventListener(
             "end",
-            handleSessionEnd
+            () => {
+
+                if (renderer) {
+
+                    renderer.setAnimationLoop(
+                        null
+                    );
+                }
+
+
+                session =
+                    null;
+
+
+                startButton.style.display =
+                    "inline-block";
+
+
+                startButton.disabled =
+                    false;
+
+
+                status.textContent =
+                    "AR ended.";
+            }
         );
 
 
     } catch (error) {
 
         console.error(
-            "AR START ERROR:",
+            "AR ERROR:",
             error
         );
 
@@ -516,806 +277,144 @@ async function startAR() {
 
 
 // =====================================================
-// PLACE CUBE
+// INSPECT XR INPUT SOURCES
 // =====================================================
 
-function placeCube() {
+function inspectInputSources() {
 
-    if (
-
-        !currentHit ||
-
-        !reticle ||
-
-        !reticle.visible
-    ) {
+    if (!session) {
 
         return;
     }
 
 
-    const pose =
-        currentHit.getPose(
-            localReferenceSpace
-        );
+    const sources =
+        session.inputSources;
 
 
-    if (!pose) {
-
-        return;
-    }
-
-
-    // ---------------------------------------------
-    // Put cube at hit position
-    // ---------------------------------------------
-
-    cube.position.set(
-
-        pose.transform.position.x,
-
-        pose.transform.position.y,
-
-        pose.transform.position.z
+    console.log(
+        "XR INPUT SOURCES:",
+        sources
     );
 
 
-    cube.quaternion.set(
-
-        pose.transform.orientation.x,
-
-        pose.transform.orientation.y,
-
-        pose.transform.orientation.z,
-
-        pose.transform.orientation.w
-    );
-
-
-    cube.visible =
-        true;
-
-
-    cubePlaced =
-        true;
-
-
-    status.textContent =
-        "🧊 CUBE PLACED — USE YOUR HAND TO GRAB IT";
-}
-
-
-// =====================================================
-// GET HAND JOINT POSE
-// =====================================================
-
-function getJointPosition(
-    hand,
-    frame,
-    jointName
-) {
-
-    if (
-        !hand ||
-        !hand.hand
-    ) {
-
-        return null;
-    }
-
-
-    const joint =
-        hand.hand.get(
-            jointName
-        );
-
-
-    if (!joint) {
-
-        return null;
-    }
-
-
-    const pose =
-        frame.getJointPose(
-            joint,
-            localReferenceSpace
-        );
-
-
-    if (!pose) {
-
-        return null;
-    }
-
-
-    return new THREE.Vector3(
-
-        pose.transform.position.x,
-
-        pose.transform.position.y,
-
-        pose.transform.position.z
-    );
-}
-
-
-// =====================================================
-// UPDATE ONE HAND
-// =====================================================
-
-function updateHand(
-    hand,
-    frame,
-    jointOffset,
-    side
-) {
-
-    if (
-        !hand ||
-        !hand.hand
-    ) {
-
-        return false;
-    }
-
-
-    const thumbTip =
-        getJointPosition(
-            hand,
-            frame,
-            "thumb-tip"
-        );
-
-
-    const indexTip =
-        getJointPosition(
-            hand,
-            frame,
-            "index-finger-tip"
-        );
-
-
-    if (
-        !thumbTip ||
-        !indexTip
-    ) {
-
-        return false;
-    }
-
-
-    // ---------------------------------------------
-    // Pinch point
-    // ---------------------------------------------
-
-    const pinchPoint =
-        new THREE.Vector3()
-            .addVectors(
-                thumbTip,
-                indexTip
-            )
-            .multiplyScalar(0.5);
-
-
-    // ---------------------------------------------
-    // Pinch distance
-    // ---------------------------------------------
-
-    const pinchDistance =
-        thumbTip.distanceTo(
-            indexTip
-        );
-
-
-    const isPinching =
-        pinchDistance <
-        PINCH_DISTANCE;
-
-
-    // ---------------------------------------------
-    // Save positions
-    // ---------------------------------------------
-
-    if (side === "left") {
-
-        leftPinchPosition.copy(
-            pinchPoint
-        );
-
-        pinchLeft =
-            isPinching;
-
-    } else {
-
-        rightPinchPosition.copy(
-            pinchPoint
-        );
-
-        pinchRight =
-            isPinching;
-    }
-
-
-    // ---------------------------------------------
-    // Draw thumb
-    // ---------------------------------------------
-
-    const thumbJoint =
-        hand.hand.get(
-            "thumb-tip"
-        );
-
-
-    const indexJoint =
-        hand.hand.get(
-            "index-finger-tip"
-        );
-
-
-    const thumbPose =
-        frame.getJointPose(
-            thumbJoint,
-            localReferenceSpace
-        );
-
-
-    const indexPose =
-        frame.getJointPose(
-            indexJoint,
-            localReferenceSpace
-        );
-
-
-    if (
-        thumbPose &&
-        indexPose
-    ) {
-
-        const thumbVisual =
-            handJoints[
-                jointOffset
-            ];
-
-
-        const indexVisual =
-            handJoints[
-                jointOffset + 1
-            ];
-
-
-        thumbVisual.position.set(
-
-            thumbPose.transform.position.x,
-
-            thumbPose.transform.position.y,
-
-            thumbPose.transform.position.z
-        );
-
-
-        indexVisual.position.set(
-
-            indexPose.transform.position.x,
-
-            indexPose.transform.position.y,
-
-            indexPose.transform.position.z
-        );
-
-
-        thumbVisual.visible =
-            true;
-
-
-        indexVisual.visible =
-            true;
-
-
-        // -----------------------------------------
-        // Pinch point
-        // -----------------------------------------
-
-        const pinchVisual =
-            handJoints[
-                jointOffset + 2
-            ];
-
-
-        pinchVisual.position.copy(
-            pinchPoint
-        );
-
-
-        pinchVisual.visible =
-            true;
-
-
-        pinchVisual.material.color.set(
-            isPinching
-                ? 0x00ff00
-                : 0xff00ff
-        );
-    }
-
-
-    return true;
-}
-
-
-// =====================================================
-// HIDE HAND VISUALS
-// =====================================================
-
-function hideHandVisuals(
-    offset
-) {
-
-    for (
-        let i = offset;
-        i < offset + 3;
-        i++
-    ) {
-
-        if (handJoints[i]) {
-
-            handJoints[i].visible =
-                false;
-        }
-    }
-}
-
-
-// =====================================================
-// CHECK HAND GRAB
-// =====================================================
-
-function handleSingleHandGrab(
-    pinchPosition,
-    isPinching
-) {
-
-    if (!cubePlaced) {
-
-        return;
-    }
-
-
-    const cubeDistance =
-        pinchPosition.distanceTo(
-            cube.position
-        );
-
-
-    // ---------------------------------------------
-    // Start grab
-    // ---------------------------------------------
-
-    if (
-        isPinching &&
-        !cubeGrabbed &&
-        cubeDistance < GRAB_DISTANCE
-    ) {
-
-        cubeGrabbed =
-            true;
-
-        grabMode =
-            "single";
-
-
-        grabOffset =
-            cube.position.clone()
-                .sub(
-                    pinchPosition
-                );
-
+    // -------------------------------------------------
+    // No input sources
+    // -------------------------------------------------
+
+    if (!sources || sources.length === 0) {
 
         status.textContent =
-            "🤏 CUBE GRABBED";
+            "⚠️ AR works, but NO XR input source detected.";
+
+        return;
     }
 
 
-    // ---------------------------------------------
-    // Move grabbed cube
-    // ---------------------------------------------
+    let handCount =
+        0;
 
-    if (
-        cubeGrabbed &&
-        grabMode === "single"
+    let screenCount =
+        0;
+
+    let controllerCount =
+        0;
+
+
+    for (
+        const source of sources
     ) {
 
-        if (isPinching) {
+        console.log(
+            "XR SOURCE:",
+            {
+                handedness:
+                    source.handedness,
 
-            cube.position.copy(
-                pinchPosition
-            );
+                targetRayMode:
+                    source.targetRayMode,
+
+                hand:
+                    source.hand
+            }
+        );
 
 
-            cube.position.add(
-                grabOffset
-            );
+        if (source.hand) {
 
+            handCount++;
 
-            status.textContent =
-                "✋ MOVING CUBE";
+        } else if (
+            source.targetRayMode ===
+            "screen"
+        ) {
+
+            screenCount++;
 
         } else {
 
-            cubeGrabbed =
-                false;
-
-            grabMode =
-                "none";
-
-
-            status.textContent =
-                "🧊 CUBE RELEASED";
+            controllerCount++;
         }
     }
-}
 
 
-// =====================================================
-// TWO HAND SCALE
-// =====================================================
+    // -------------------------------------------------
+    // HAND TRACKING FOUND
+    // -------------------------------------------------
 
-function handleTwoHandScale() {
-
-    if (
-        !cubePlaced ||
-        !pinchLeft ||
-        !pinchRight
-    ) {
-
-        if (
-            grabMode === "two-hand"
-        ) {
-
-            twoHandScaling =
-                false;
-
-            grabMode =
-                "none";
-
-            status.textContent =
-                "🧊 TWO-HAND CONTROL ENDED";
-        }
-
-        return;
-    }
-
-
-    const distance =
-        leftPinchPosition.distanceTo(
-            rightPinchPosition
-        );
-
-
-    // ---------------------------------------------
-    // Start two-hand mode
-    // ---------------------------------------------
-
-    if (!twoHandScaling) {
-
-        twoHandScaling =
-            true;
-
-        cubeGrabbed =
-            false;
-
-        grabMode =
-            "two-hand";
-
-
-        scaleStartDistance =
-            distance;
-
-
-        scaleStartSize =
-            cube.scale.x;
-
+    if (handCount > 0) {
 
         status.textContent =
-            "🤲 TWO-HAND CONTROL";
-    }
-
-
-    // ---------------------------------------------
-    // Scale
-    // ---------------------------------------------
-
-    if (
-        scaleStartDistance <= 0
-    ) {
+            "🔥 HAND TRACKING DETECTED: " +
+            handCount;
 
         return;
     }
 
 
-    const ratio =
-        distance /
-        scaleStartDistance;
+    // -------------------------------------------------
+    // ONLY SCREEN INPUT
+    // -------------------------------------------------
+
+    if (screenCount > 0) {
+
+        status.textContent =
+            "📱 SCREEN INPUT ONLY — no hand tracking.";
+
+        return;
+    }
 
 
-    let newScale =
-        scaleStartSize *
-        ratio;
-
-
-    newScale =
-        Math.max(
-            MIN_CUBE_SIZE / 0.20,
-            Math.min(
-                MAX_CUBE_SIZE / 0.20,
-                newScale
-            )
-        );
-
-
-    cube.scale.set(
-        newScale,
-        newScale,
-        newScale
-    );
-
-
-    // ---------------------------------------------
-    // Move cube to hand midpoint
-    // ---------------------------------------------
-
-    const midpoint =
-        new THREE.Vector3()
-            .addVectors(
-                leftPinchPosition,
-                rightPinchPosition
-            )
-            .multiplyScalar(0.5);
-
-
-    cube.position.copy(
-        midpoint
-    );
-
+    // -------------------------------------------------
+    // OTHER INPUT
+    // -------------------------------------------------
 
     status.textContent =
-        "🤲 SCALE + MOVE";
+        "🎮 XR INPUT FOUND, but no hand input.";
 }
 
 
 // =====================================================
-// UPDATE HAND TRACKING
+// XR RENDER
 // =====================================================
 
-function updateHandTracking(
-    frame
-) {
-
-    pinchLeft =
-        false;
-
-    pinchRight =
-        false;
-
-
-    // ---------------------------------------------
-    // Left hand
-    // ---------------------------------------------
-
-    const leftDetected =
-        updateHand(
-
-            leftHand,
-
-            frame,
-
-            0,
-
-            "left"
-        );
-
-
-    if (!leftDetected) {
-
-        hideHandVisuals(0);
-    }
-
-
-    // ---------------------------------------------
-    // Right hand
-    // ---------------------------------------------
-
-    const rightDetected =
-        updateHand(
-
-            rightHand,
-
-            frame,
-
-            3,
-
-            "right"
-        );
-
-
-    if (!rightDetected) {
-
-        hideHandVisuals(3);
-    }
-
-
-    // ---------------------------------------------
-    // Hand tracking unavailable
-    // ---------------------------------------------
-
-    if (
-        !leftDetected &&
-        !rightDetected
-    ) {
-
-        if (cubePlaced) {
-
-            status.textContent =
-                "🖐️ SHOW YOUR HANDS";
-        }
-
-        return;
-    }
-
-
-    // ---------------------------------------------
-    // TWO HAND MODE
-    // ---------------------------------------------
-
-    if (
-        leftDetected &&
-        rightDetected &&
-        pinchLeft &&
-        pinchRight
-    ) {
-
-        handleTwoHandScale();
-
-        return;
-    }
-
-
-    // ---------------------------------------------
-    // SINGLE HAND MODE
-    // ---------------------------------------------
-
-    if (
-        grabMode === "two-hand"
-    ) {
-
-        twoHandScaling =
-            false;
-
-        grabMode =
-            "none";
-    }
-
-
-    if (leftDetected && pinchLeft) {
-
-        handleSingleHandGrab(
-            leftPinchPosition,
-            pinchLeft
-        );
-
-    } else if (
-        rightDetected &&
-        pinchRight
-    ) {
-
-        handleSingleHandGrab(
-            rightPinchPosition,
-            pinchRight
-        );
-
-    } else if (
-        cubeGrabbed &&
-        grabMode === "single"
-    ) {
-
-        cubeGrabbed =
-            false;
-
-        grabMode =
-            "none";
-
-        status.textContent =
-            "🧊 CUBE RELEASED";
-    }
-}
-
-
-// =====================================================
-// XR RENDER LOOP
-// =====================================================
-
-function renderAR(
+function render(
     time,
     frame
 ) {
 
-    if (
-        !frame ||
-        !xrSession
-    ) {
+    if (!frame) {
 
         return;
     }
 
 
-    // ---------------------------------------------
-    // Hit testing
-    // ---------------------------------------------
+    // Keep checking input sources
+    // because they can change during
+    // the AR session.
 
-    currentHit =
-        null;
+    inspectInputSources();
 
-
-    if (hitTestSource) {
-
-        const hitResults =
-            frame.getHitTestResults(
-                hitTestSource
-            );
-
-
-        if (
-            hitResults.length > 0
-        ) {
-
-            currentHit =
-                hitResults[0];
-
-
-            const hitPose =
-                currentHit.getPose(
-                    localReferenceSpace
-                );
-
-
-            if (hitPose) {
-
-                reticle.visible =
-                    true;
-
-
-                reticle.matrix.fromArray(
-                    hitPose.transform.matrix
-                );
-
-
-                if (!cubePlaced) {
-
-                    status.textContent =
-                        "🎯 SURFACE FOUND — TAP TO PLACE";
-                }
-            }
-
-        } else {
-
-            reticle.visible =
-                false;
-        }
-    }
-
-
-    // ---------------------------------------------
-    // Hand tracking
-    // ---------------------------------------------
-
-    updateHandTracking(
-        frame
-    );
-
-
-    // ---------------------------------------------
-    // Render
-    // ---------------------------------------------
 
     renderer.render(
         scene,
@@ -1325,94 +424,7 @@ function renderAR(
 
 
 // =====================================================
-// SESSION END
-// =====================================================
-
-function handleSessionEnd() {
-
-    if (renderer) {
-
-        renderer.setAnimationLoop(
-            null
-        );
-    }
-
-
-    if (hitTestSource) {
-
-        try {
-
-            hitTestSource.cancel();
-
-        } catch (error) {
-
-            console.warn(error);
-        }
-    }
-
-
-    xrSession =
-        null;
-
-    hitTestSource =
-        null;
-
-    localReferenceSpace =
-        null;
-
-    viewerSpace =
-        null;
-
-
-    currentHit =
-        null;
-
-
-    cubePlaced =
-        false;
-
-
-    cubeGrabbed =
-        false;
-
-
-    twoHandScaling =
-        false;
-
-
-    grabMode =
-        "none";
-
-
-    if (cube) {
-
-        cube.visible =
-            false;
-    }
-
-
-    if (reticle) {
-
-        reticle.visible =
-            false;
-    }
-
-
-    startButton.style.display =
-        "inline-block";
-
-
-    startButton.disabled =
-        false;
-
-
-    status.textContent =
-        "AR session ended.";
-}
-
-
-// =====================================================
-// START BUTTON
+// BUTTON
 // =====================================================
 
 startButton.addEventListener(
@@ -1422,11 +434,10 @@ startButton.addEventListener(
 
 
 // =====================================================
-// INITIALIZE
+// INITIAL CHECK
 // =====================================================
 
 startButton.disabled =
     true;
 
-
-checkARSupport();
+checkAR();
