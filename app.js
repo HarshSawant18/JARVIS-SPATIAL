@@ -113,7 +113,7 @@ async function initializeHandTracking() {
             );
 
 
-        // Create hand detector
+        // Create Hand Landmarker
 
         handLandmarker =
             await HandLandmarker.createFromOptions(
@@ -132,7 +132,7 @@ async function initializeHandTracking() {
                     runningMode:
                         "VIDEO",
 
-                    // TWO HANDS
+                    // Track TWO hands
 
                     numHands:
                         2,
@@ -166,13 +166,12 @@ async function initializeHandTracking() {
 
         status.textContent =
             "❌ MediaPipe failed to load";
-
     }
 }
 
 
 // =====================================================
-// START CAMERA
+// START REAR CAMERA
 // =====================================================
 
 async function startCamera() {
@@ -180,32 +179,35 @@ async function startCamera() {
     try {
 
         status.textContent =
-            "Requesting camera...";
+            "Requesting rear camera...";
 
 
-        // Use front/selfie camera
-        // for this test.
+        // IMPORTANT:
+        // environment = rear camera
 
         const stream =
             await navigator.mediaDevices.getUserMedia({
 
                 video: {
 
-    facingMode: "environment",
-    width: {
-        ideal: 1280
-    },
-    height: {
-        ideal: 720
-    }
+                    facingMode: {
+                        ideal: "environment"
+                    },
+
+                    width: {
+                        ideal: 1280
+                    },
+
+                    height: {
+                        ideal: 720
+                    }
                 },
 
                 audio: false
-
             });
 
 
-        // Attach camera
+        // Attach camera stream
 
         video.srcObject =
             stream;
@@ -216,12 +218,12 @@ async function startCamera() {
         await video.play();
 
 
-        // Resize canvas
+        // Resize overlay
 
         resizeCanvas();
 
 
-        // Start tracking
+        // Start detection
 
         cameraStarted =
             true;
@@ -232,7 +234,7 @@ async function startCamera() {
 
 
         status.textContent =
-            "📷 Camera active — show your hands";
+            "📷 Rear camera active — show your hands";
 
 
         requestAnimationFrame(
@@ -294,7 +296,7 @@ function drawHand(
 
 
     // =================================================
-    // DRAW CONNECTIONS
+    // DRAW BONES
     // =================================================
 
     ctx.strokeStyle =
@@ -374,7 +376,7 @@ function drawHand(
 
 
     // =================================================
-    // PINCH
+    // PINCH DETECTION
     // =================================================
 
     const thumb =
@@ -396,7 +398,7 @@ function drawHand(
 
 
     // =================================================
-    // THUMB → INDEX LINE
+    // DRAW THUMB → INDEX
     // =================================================
 
     ctx.beginPath();
@@ -496,13 +498,13 @@ async function detectHands() {
     }
 
 
-    // Make sure canvas matches camera
+    // Make sure overlay matches
+    // camera resolution.
 
     resizeCanvas();
 
 
-    // Detect only when
-    // a new video frame exists.
+    // Detect when video advances
 
     if (
 
@@ -518,7 +520,7 @@ async function detectHands() {
 
 
         // ---------------------------------------------
-        // MediaPipe detection
+        // MediaPipe
         // ---------------------------------------------
 
         const results =
@@ -530,7 +532,9 @@ async function detectHands() {
             );
 
 
-        // Clear old drawing
+        // ---------------------------------------------
+        // Clear old landmarks
+        // ---------------------------------------------
 
         ctx.clearRect(
 
@@ -544,12 +548,16 @@ async function detectHands() {
         );
 
 
+        // ---------------------------------------------
+        // Get detected hands
+        // ---------------------------------------------
+
         const hands =
             results.landmarks || [];
 
 
         // ---------------------------------------------
-        // No hands
+        // No hand
         // ---------------------------------------------
 
         if (
@@ -562,7 +570,7 @@ async function detectHands() {
 
 
         // ---------------------------------------------
-        // Draw all hands
+        // Draw every detected hand
         // ---------------------------------------------
 
         let pinchCount =
@@ -624,7 +632,7 @@ async function detectHands() {
     }
 
 
-    // Continue loop
+    // Continue tracking
 
     requestAnimationFrame(
         detectHands
