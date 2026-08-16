@@ -18,9 +18,7 @@ const status =
 // =====================================================
 
 let renderer = null;
-
 let scene = null;
-
 let camera = null;
 
 
@@ -29,23 +27,20 @@ let camera = null;
 // =====================================================
 
 let xrSession = null;
-
-let hitTestSource = null;
-
 let localReferenceSpace = null;
+let hitTestSource = null;
 
 
 // =====================================================
-// AR OBJECTS
+// OBJECTS
 // =====================================================
 
 let reticle = null;
-
 let cube = null;
 
 
 // =====================================================
-// CHECK AR SUPPORT
+// CHECK AR
 // =====================================================
 
 async function checkARSupport() {
@@ -53,13 +48,12 @@ async function checkARSupport() {
     if (!navigator.xr) {
 
         status.textContent =
-            "❌ WebXR is not available.";
+            "WebXR is not available.";
 
         startButton.disabled = true;
 
         return;
     }
-
 
     try {
 
@@ -67,7 +61,6 @@ async function checkARSupport() {
             await navigator.xr.isSessionSupported(
                 "immersive-ar"
             );
-
 
         if (supported) {
 
@@ -89,7 +82,7 @@ async function checkARSupport() {
         console.error(error);
 
         status.textContent =
-            "❌ Could not check AR support.";
+            "❌ AR check failed.";
 
         startButton.disabled = true;
     }
@@ -97,7 +90,7 @@ async function checkARSupport() {
 
 
 // =====================================================
-// CREATE THREE.JS SCENE
+// CREATE SCENE
 // =====================================================
 
 function createScene() {
@@ -105,29 +98,25 @@ function createScene() {
     scene = new THREE.Scene();
 
 
-    // -------------------------------------------------
-    // CAMERA
-    // -------------------------------------------------
+    // Camera
 
     camera =
         new THREE.PerspectiveCamera();
 
 
-    // -------------------------------------------------
-    // LIGHT
-    // -------------------------------------------------
+    camera.matrixAutoUpdate = false;
 
-    const hemisphereLight =
+
+    // Light
+
+    const light =
         new THREE.HemisphereLight(
             0xffffff,
             0xbbbbff,
             3
         );
 
-
-    scene.add(
-        hemisphereLight
-    );
+    scene.add(light);
 
 
     // -------------------------------------------------
@@ -137,10 +126,9 @@ function createScene() {
     const reticleGeometry =
         new THREE.RingGeometry(
             0.08,
-            0.10,
+            0.11,
             32
         );
-
 
     reticleGeometry.rotateX(
         -Math.PI / 2
@@ -160,17 +148,12 @@ function createScene() {
         );
 
 
-    reticle.matrixAutoUpdate =
-        false;
+    reticle.matrixAutoUpdate = false;
+
+    reticle.visible = false;
 
 
-    reticle.visible =
-        false;
-
-
-    scene.add(
-        reticle
-    );
+    scene.add(reticle);
 }
 
 
@@ -180,25 +163,19 @@ function createScene() {
 
 function createCube() {
 
-    if (cube) {
-
-        return;
-    }
-
-
     const geometry =
         new THREE.BoxGeometry(
-            0.15,
-            0.15,
-            0.15
+            0.20,
+            0.20,
+            0.20
         );
 
 
     const material =
         new THREE.MeshStandardMaterial({
             color: 0x00aaff,
-            roughness: 0.35,
-            metalness: 0.25
+            roughness: 0.3,
+            metalness: 0.4
         });
 
 
@@ -209,13 +186,10 @@ function createCube() {
         );
 
 
-    cube.visible =
-        false;
+    cube.visible = false;
 
 
-    scene.add(
-        cube
-    );
+    scene.add(cube);
 }
 
 
@@ -231,82 +205,66 @@ async function startAR() {
             "Starting AR...";
 
 
-        // =================================================
-        // CREATE RENDERER
-        // =================================================
-
-        if (!renderer) {
-
-            renderer =
-                new THREE.WebGLRenderer({
-
-                    alpha: true,
-
-                    antialias: true
-                });
-
-
-            renderer.setPixelRatio(
-                window.devicePixelRatio
-            );
-
-
-            renderer.setSize(
-                window.innerWidth,
-                window.innerHeight
-            );
-
-
-            // Transparent background.
-            // The phone camera provides the background.
-
-            renderer.setClearColor(
-                0x000000,
-                0
-            );
-
-
-            renderer.xr.enabled =
-                true;
-
-
-            renderer.xr.setReferenceSpaceType(
-                "local"
-            );
-
-
-            document.body.appendChild(
-                renderer.domElement
-            );
-        }
-
-
-        // =================================================
-        // CREATE SCENE
-        // =================================================
+        // -------------------------------------------------
+        // Scene
+        // -------------------------------------------------
 
         createScene();
 
         createCube();
 
 
-        // =================================================
-        // REQUEST AR SESSION
-        // =================================================
+        // -------------------------------------------------
+        // Renderer
+        // -------------------------------------------------
+
+        renderer =
+            new THREE.WebGLRenderer({
+                antialias: true,
+                alpha: true
+            });
+
+
+        renderer.setPixelRatio(
+            window.devicePixelRatio
+        );
+
+
+        renderer.setSize(
+            window.innerWidth,
+            window.innerHeight
+        );
+
+
+        renderer.setClearColor(
+            0x000000,
+            0
+        );
+
+
+        renderer.xr.enabled = true;
+
+
+        document.body.appendChild(
+            renderer.domElement
+        );
+
+
+        // -------------------------------------------------
+        // AR Session
+        // -------------------------------------------------
 
         xrSession =
             await navigator.xr.requestSession(
                 "immersive-ar",
                 {
-
                     requiredFeatures: [
+                        "local",
                         "hit-test"
                     ],
-
                     optionalFeatures: [
                         "dom-overlay"
                     ],
-
                     domOverlay: {
                         root: document.body
                     }
@@ -314,18 +272,18 @@ async function startAR() {
             );
 
 
-        // =================================================
-        // GIVE SESSION TO THREE.JS
-        // =================================================
+        // -------------------------------------------------
+        // Give session to Three.js
+        // -------------------------------------------------
 
         await renderer.xr.setSession(
             xrSession
         );
 
 
-        // =================================================
-        // REFERENCE SPACE
-        // =================================================
+        // -------------------------------------------------
+        // Reference space
+        // -------------------------------------------------
 
         localReferenceSpace =
             await xrSession.requestReferenceSpace(
@@ -333,9 +291,9 @@ async function startAR() {
             );
 
 
-        // =================================================
-        // VIEWER SPACE
-        // =================================================
+        // -------------------------------------------------
+        // Viewer space
+        // -------------------------------------------------
 
         const viewerSpace =
             await xrSession.requestReferenceSpace(
@@ -343,9 +301,9 @@ async function startAR() {
             );
 
 
-        // =================================================
-        // HIT TEST SOURCE
-        // =================================================
+        // -------------------------------------------------
+        // Hit test source
+        // -------------------------------------------------
 
         hitTestSource =
             await xrSession.requestHitTestSource({
@@ -353,51 +311,63 @@ async function startAR() {
             });
 
 
-        // =================================================
-        // SCREEN TAP / SELECT
-        // =================================================
-
-        xrSession.addEventListener(
-            "select",
-            placeCube
-        );
-
-
-        // =================================================
-        // UPDATE UI
-        // =================================================
+        // -------------------------------------------------
+        // UI
+        // -------------------------------------------------
 
         startButton.style.display =
             "none";
 
 
         status.textContent =
-            "📷 AR ACTIVE — move your phone slowly";
+            "📷 Move your phone slowly around the room";
 
 
-        // =================================================
-        // XR RENDER LOOP
-        // =================================================
+        // -------------------------------------------------
+        // XR LOOP
+        // -------------------------------------------------
 
         renderer.setAnimationLoop(
             renderAR
         );
 
 
-        // =================================================
-        // AR SESSION END
-        // =================================================
+        // -------------------------------------------------
+        // END SESSION
+        // -------------------------------------------------
 
         xrSession.addEventListener(
             "end",
-            handleSessionEnd
+            () => {
+
+                renderer.setAnimationLoop(null);
+
+                xrSession = null;
+
+                hitTestSource = null;
+
+                localReferenceSpace = null;
+
+                if (reticle) {
+                    reticle.visible = false;
+                }
+
+                startButton.style.display =
+                    "inline-block";
+
+                startButton.disabled =
+                    false;
+
+                status.textContent =
+                    "AR ended.";
+            }
         );
 
 
     } catch (error) {
 
         console.error(
-            "AR START ERROR:",
+            "AR ERROR:",
             error
         );
 
@@ -412,7 +382,7 @@ async function startAR() {
 
 
 // =====================================================
-// AR RENDER LOOP
+// AR FRAME LOOP
 // =====================================================
 
 function renderAR(
@@ -420,68 +390,91 @@ function renderAR(
     frame
 ) {
 
-    if (!frame || !xrSession) {
+    if (
+        !frame ||
+        !xrSession
+    ) {
 
         return;
     }
 
 
-    // =================================================
-    // HIT TEST
-    // =================================================
+    // -------------------------------------------------
+    // Hit test
+    // -------------------------------------------------
 
     if (hitTestSource) {
 
-        const hitTestResults =
+        const results =
             frame.getHitTestResults(
                 hitTestSource
             );
 
 
-        if (
-            hitTestResults.length > 0
-        ) {
+        if (results.length > 0) {
 
             const hit =
-                hitTestResults[0];
+                results[0];
 
 
-            const hitPose =
+            const pose =
                 hit.getPose(
                     localReferenceSpace
                 );
 
 
-            if (hitPose) {
+            if (pose) {
 
-                reticle.visible =
-                    true;
+                // Show reticle
+
+                reticle.visible = true;
 
 
                 reticle.matrix.fromArray(
-                    hitPose.transform.matrix
+                    pose.transform.matrix
                 );
 
 
-                if (!cube ||
-                    !cube.visible) {
+                // -------------------------------------------------
+                // AUTO PLACE CUBE
+                // -------------------------------------------------
+
+                if (!cube.visible) {
+
+                    cube.matrix.fromArray(
+                        pose.transform.matrix
+                    );
+
+
+                    cube.matrixAutoUpdate =
+                        false;
+
+
+                    cube.visible = true;
+
 
                     status.textContent =
-                        "🎯 SURFACE FOUND — TAP TO PLACE";
+                        "🧊 CUBE PLACED — MOVE YOUR PHONE";
                 }
             }
 
         } else {
 
-            reticle.visible =
-                false;
+            reticle.visible = false;
+
+
+            if (!cube.visible) {
+
+                status.textContent =
+                    "🔎 Looking for a surface...";
+            }
         }
     }
 
 
-    // =================================================
-    // RENDER SCENE
-    // =================================================
+    // -------------------------------------------------
+    // Render
+    // -------------------------------------------------
 
     renderer.render(
         scene,
@@ -491,99 +484,7 @@ function renderAR(
 
 
 // =====================================================
-// PLACE CUBE
-// =====================================================
-
-function placeCube() {
-
-    if (
-        !reticle ||
-        !reticle.visible ||
-        !cube
-    ) {
-
-        return;
-    }
-
-
-    // Get position from reticle
-
-    cube.position.setFromMatrixPosition(
-        reticle.matrix
-    );
-
-
-    // Get orientation from reticle
-
-    cube.quaternion.setFromRotationMatrix(
-        reticle.matrix
-    );
-
-
-    cube.visible =
-        true;
-
-
-    status.textContent =
-        "🧊 CUBE PLACED!";
-}
-
-
-// =====================================================
-// HANDLE AR SESSION END
-// =====================================================
-
-function handleSessionEnd() {
-
-    if (renderer) {
-
-        renderer.setAnimationLoop(
-            null
-        );
-    }
-
-
-    xrSession =
-        null;
-
-
-    hitTestSource =
-        null;
-
-
-    localReferenceSpace =
-        null;
-
-
-    if (reticle) {
-
-        reticle.visible =
-            false;
-    }
-
-
-    if (cube) {
-
-        cube.visible =
-            false;
-    }
-
-
-    startButton.style.display =
-        "inline-block";
-
-
-    startButton.disabled =
-        false;
-
-
-    status.textContent =
-        "AR session ended.";
-}
-
-
-// =====================================================
-// START BUTTON
+// BUTTON
 // =====================================================
 
 startButton.addEventListener(
@@ -596,8 +497,6 @@ startButton.addEventListener(
 // INITIALIZE
 // =====================================================
 
-startButton.disabled =
-    true;
-
+startButton.disabled = true;
 
 checkARSupport();
