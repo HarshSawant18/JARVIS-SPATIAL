@@ -103,12 +103,17 @@ async function initializeHandTracking() {
             "Loading hand tracking...";
 
 
+        // Load MediaPipe WASM
+
         const vision =
             await FilesetResolver.forVisionTasks(
 
                 "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+
             );
 
+
+        // Create hand detector
 
         handLandmarker =
             await HandLandmarker.createFromOptions(
@@ -126,6 +131,8 @@ async function initializeHandTracking() {
 
                     runningMode:
                         "VIDEO",
+
+                    // TWO HANDS
 
                     numHands:
                         2,
@@ -151,15 +158,15 @@ async function initializeHandTracking() {
 
     } catch (error) {
 
-        console.error(error);
+        console.error(
+            "MediaPipe initialization error:",
+            error
+        );
+
 
         status.textContent =
             "❌ MediaPipe failed to load";
 
-        console.error(
-            "MediaPipe error:",
-            error
-        );
     }
 }
 
@@ -176,13 +183,15 @@ async function startCamera() {
             "Requesting camera...";
 
 
+        // Use front/selfie camera
+        // for this test.
+
         const stream =
             await navigator.mediaDevices.getUserMedia({
 
                 video: {
 
-                    facingMode:
-                        "user",
+                    facingMode: "user",
 
                     width: {
                         ideal: 1280
@@ -194,18 +203,27 @@ async function startCamera() {
                 },
 
                 audio: false
+
             });
 
+
+        // Attach camera
 
         video.srcObject =
             stream;
 
 
+        // Wait for camera
+
         await video.play();
 
 
+        // Resize canvas
+
         resizeCanvas();
 
+
+        // Start tracking
 
         cameraStarted =
             true;
@@ -226,12 +244,15 @@ async function startCamera() {
 
     } catch (error) {
 
-        console.error(error);
+        console.error(
+            "Camera error:",
+            error
+        );
+
 
         status.textContent =
             "❌ Camera error: " +
             error.name;
-
     }
 }
 
@@ -242,7 +263,10 @@ async function startCamera() {
 
 function resizeCanvas() {
 
-    if (!video.videoWidth) {
+    if (
+        !video.videoWidth ||
+        !video.videoHeight
+    ) {
 
         return;
     }
@@ -260,7 +284,9 @@ function resizeCanvas() {
 // DRAW HAND
 // =====================================================
 
-function drawHand(landmarks) {
+function drawHand(
+    landmarks
+) {
 
     const width =
         canvas.width;
@@ -269,9 +295,9 @@ function drawHand(landmarks) {
         canvas.height;
 
 
-    // -------------------------------------------------
-    // Draw bones
-    // -------------------------------------------------
+    // =================================================
+    // DRAW CONNECTIONS
+    // =================================================
 
     ctx.strokeStyle =
         "#00ffff";
@@ -285,28 +311,29 @@ function drawHand(landmarks) {
         of HAND_CONNECTIONS
     ) {
 
-        const a =
+        const startPoint =
             landmarks[start];
 
-        const b =
+        const endPoint =
             landmarks[end];
 
 
         ctx.beginPath();
 
+
         ctx.moveTo(
 
-            a.x * width,
+            startPoint.x * width,
 
-            a.y * height
+            startPoint.y * height
         );
 
 
         ctx.lineTo(
 
-            b.x * width,
+            endPoint.x * width,
 
-            b.y * height
+            endPoint.y * height
         );
 
 
@@ -314,9 +341,9 @@ function drawHand(landmarks) {
     }
 
 
-    // -------------------------------------------------
-    // Draw landmarks
-    // -------------------------------------------------
+    // =================================================
+    // DRAW LANDMARKS
+    // =================================================
 
     for (
         const point
@@ -348,9 +375,9 @@ function drawHand(landmarks) {
     }
 
 
-    // -------------------------------------------------
-    // Pinch
-    // -------------------------------------------------
+    // =================================================
+    // PINCH
+    // =================================================
 
     const thumb =
         landmarks[4];
@@ -370,9 +397,12 @@ function drawHand(landmarks) {
         pinchDistance < 0.06;
 
 
-    // Draw thumb-index connection
+    // =================================================
+    // THUMB → INDEX LINE
+    // =================================================
 
     ctx.beginPath();
+
 
     ctx.moveTo(
 
@@ -381,6 +411,7 @@ function drawHand(landmarks) {
         thumb.y * height
     );
 
+
     ctx.lineTo(
 
         index.x * width,
@@ -388,18 +419,23 @@ function drawHand(landmarks) {
         index.y * height
     );
 
+
     ctx.strokeStyle =
         pinch
             ? "#00ff00"
             : "#ff00ff";
 
+
     ctx.lineWidth =
         5;
+
 
     ctx.stroke();
 
 
-    // Pinch point
+    // =================================================
+    // PINCH POINT
+    // =================================================
 
     const pinchX =
         (
@@ -416,6 +452,7 @@ function drawHand(landmarks) {
 
 
     ctx.beginPath();
+
 
     ctx.arc(
 
@@ -461,17 +498,30 @@ async function detectHands() {
     }
 
 
+    // Make sure canvas matches camera
+
     resizeCanvas();
 
 
+    // Detect only when
+    // a new video frame exists.
+
     if (
+
         video.readyState >= 2 &&
-        video.currentTime !== lastVideoTime
+
+        video.currentTime !==
+            lastVideoTime
+
     ) {
 
         lastVideoTime =
             video.currentTime;
 
+
+        // ---------------------------------------------
+        // MediaPipe detection
+        // ---------------------------------------------
 
         const results =
             handLandmarker.detectForVideo(
@@ -482,7 +532,7 @@ async function detectHands() {
             );
 
 
-        // Clear overlay
+        // Clear old drawing
 
         ctx.clearRect(
 
@@ -500,20 +550,22 @@ async function detectHands() {
             results.landmarks || [];
 
 
-        // -------------------------------------------------
+        // ---------------------------------------------
         // No hands
-        // -------------------------------------------------
+        // ---------------------------------------------
 
-        if (hands.length === 0) {
+        if (
+            hands.length === 0
+        ) {
 
             status.textContent =
                 "🖐️ Show your hand";
         }
 
 
-        // -------------------------------------------------
-        // Draw hands
-        // -------------------------------------------------
+        // ---------------------------------------------
+        // Draw all hands
+        // ---------------------------------------------
 
         let pinchCount =
             0;
@@ -525,7 +577,9 @@ async function detectHands() {
         ) {
 
             const isPinching =
-                drawHand(hand);
+                drawHand(
+                    hand
+                );
 
 
             if (isPinching) {
@@ -535,18 +589,24 @@ async function detectHands() {
         }
 
 
-        // -------------------------------------------------
+        // ---------------------------------------------
         // Status
-        // -------------------------------------------------
+        // ---------------------------------------------
 
-        if (hands.length > 0) {
+        if (
+            hands.length > 0
+        ) {
 
-            if (pinchCount === 2) {
+            if (
+                pinchCount === 2
+            ) {
 
                 status.textContent =
                     "🔥 TWO HANDS — BOTH PINCHING";
 
-            } else if (pinchCount === 1) {
+            } else if (
+                pinchCount === 1
+            ) {
 
                 status.textContent =
                     "🤏 PINCH DETECTED";
@@ -554,7 +614,9 @@ async function detectHands() {
             } else {
 
                 status.textContent =
-                    `✋ ${hands.length} HAND${
+                    `✋ ${
+                        hands.length
+                    } HAND${
                         hands.length > 1
                             ? "S"
                             : ""
@@ -563,6 +625,8 @@ async function detectHands() {
         }
     }
 
+
+    // Continue loop
 
     requestAnimationFrame(
         detectHands
