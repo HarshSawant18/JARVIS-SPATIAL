@@ -116,20 +116,27 @@ async function startAR() {
         // THREE.JS RENDERER
         // =================================================
 
-        renderer =
-            new THREE.WebGLRenderer({
+renderer =
+    new THREE.WebGLRenderer({
 
-                canvas: canvas,
+        canvas: canvas,
 
-                context: gl,
+        context: gl,
 
-                alpha: true,
+        alpha: true,
 
-                antialias: true,
+        antialias: true,
 
-                preserveDrawingBuffer: true
+        preserveDrawingBuffer: true
 
-            });
+    });
+
+renderer.autoClear = false;
+
+renderer.setClearColor(
+    0x000000,
+    0
+);
 
 
         renderer.autoClear = false;
@@ -402,10 +409,10 @@ function onXRFrame(
         session.renderState.baseLayer;
 
 
-    renderer.setFramebuffer(
-        baseLayer.framebuffer
-    );
-
+gl.bindFramebuffer(
+    gl.FRAMEBUFFER,
+    baseLayer.framebuffer
+);
 
     // =================================================
     // GET FIRST VIEW
@@ -441,6 +448,7 @@ function onXRFrame(
         view.projectionMatrix
     );
 
+    camera.updateMatrixWorld(true);
 
     camera.matrixWorld.copy(
         camera.matrix
