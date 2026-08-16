@@ -2,18 +2,45 @@ import * as THREE from
     "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js";
 
 
-const startButton = document.getElementById("startAR");
-const status = document.getElementById("status");
+// =====================================================
+// UI
+// =====================================================
 
-let session = null;
+const startButton =
+    document.getElementById("startAR");
+
+const status =
+    document.getElementById("status");
+
+
+// =====================================================
+// THREE.JS
+// =====================================================
+
 let renderer = null;
+
 let scene = null;
+
 let camera = null;
 
+
+// =====================================================
+// WEBXR
+// =====================================================
+
+let xrSession = null;
+
 let hitTestSource = null;
-let hitTestSourceRequested = false;
+
+let localReferenceSpace = null;
+
+
+// =====================================================
+// AR OBJECTS
+// =====================================================
 
 let reticle = null;
+
 let cube = null;
 
 
@@ -21,17 +48,18 @@ let cube = null;
 // CHECK AR SUPPORT
 // =====================================================
 
-async function checkAR() {
+async function checkARSupport() {
 
     if (!navigator.xr) {
 
         status.textContent =
-            "WebXR is not available.";
+            "❌ WebXR is not available.";
 
         startButton.disabled = true;
 
         return;
     }
+
 
     try {
 
@@ -39,6 +67,7 @@ async function checkAR() {
             await navigator.xr.isSessionSupported(
                 "immersive-ar"
             );
+
 
         if (supported) {
 
@@ -50,7 +79,7 @@ async function checkAR() {
         } else {
 
             status.textContent =
-                "AR is not supported.";
+                "❌ AR is not supported.";
 
             startButton.disabled = true;
         }
@@ -60,10 +89,133 @@ async function checkAR() {
         console.error(error);
 
         status.textContent =
-            "AR check failed.";
+            "❌ Could not check AR support.";
 
         startButton.disabled = true;
     }
+}
+
+
+// =====================================================
+// CREATE THREE.JS SCENE
+// =====================================================
+
+function createScene() {
+
+    scene = new THREE.Scene();
+
+
+    // -------------------------------------------------
+    // CAMERA
+    // -------------------------------------------------
+
+    camera =
+        new THREE.PerspectiveCamera();
+
+
+    // -------------------------------------------------
+    // LIGHT
+    // -------------------------------------------------
+
+    const hemisphereLight =
+        new THREE.HemisphereLight(
+            0xffffff,
+            0xbbbbff,
+            3
+        );
+
+
+    scene.add(
+        hemisphereLight
+    );
+
+
+    // -------------------------------------------------
+    // RETICLE
+    // -------------------------------------------------
+
+    const reticleGeometry =
+        new THREE.RingGeometry(
+            0.08,
+            0.10,
+            32
+        );
+
+
+    reticleGeometry.rotateX(
+        -Math.PI / 2
+    );
+
+
+    const reticleMaterial =
+        new THREE.MeshBasicMaterial({
+            color: 0x00ff00
+        });
+
+
+    reticle =
+        new THREE.Mesh(
+            reticleGeometry,
+            reticleMaterial
+        );
+
+
+    reticle.matrixAutoUpdate =
+        false;
+
+
+    reticle.visible =
+        false;
+
+
+    scene.add(
+        reticle
+    );
+}
+
+
+// =====================================================
+// CREATE CUBE
+// =====================================================
+
+function createCube() {
+
+    if (cube) {
+
+        return;
+    }
+
+
+    const geometry =
+        new THREE.BoxGeometry(
+            0.15,
+            0.15,
+            0.15
+        );
+
+
+    const material =
+        new THREE.MeshStandardMaterial({
+            color: 0x00aaff,
+            roughness: 0.35,
+            metalness: 0.25
+        });
+
+
+    cube =
+        new THREE.Mesh(
+            geometry,
+            material
+        );
+
+
+    cube.visible =
+        false;
+
+
+    scene.add(
+        cube
+    );
 }
 
 
@@ -80,110 +232,73 @@ async function startAR() {
 
 
         // =================================================
-        // CANVAS
+        // CREATE RENDERER
         // =================================================
 
-        const canvas =
-            document.createElement("canvas");
+        if (!renderer) {
 
-        document.body.appendChild(canvas);
+            renderer =
+                new THREE.WebGLRenderer({
 
-
-        // =================================================
-        // WEBGL CONTEXT
-        // =================================================
-
-        const gl =
-            canvas.getContext(
-                "webgl",
-                {
-                    xrCompatible: true,
                     alpha: true,
+
                     antialias: true
-                }
+                });
+
+
+            renderer.setPixelRatio(
+                window.devicePixelRatio
             );
 
 
-        if (!gl) {
+            renderer.setSize(
+                window.innerWidth,
+                window.innerHeight
+            );
 
-            throw new Error(
-                "WebGL could not be created."
+
+            // Transparent background.
+            // The phone camera provides the background.
+
+            renderer.setClearColor(
+                0x000000,
+                0
+            );
+
+
+            renderer.xr.enabled =
+                true;
+
+
+            renderer.xr.setReferenceSpaceType(
+                "local"
+            );
+
+
+            document.body.appendChild(
+                renderer.domElement
             );
         }
 
 
         // =================================================
-        // THREE.JS RENDERER
+        // CREATE SCENE
         // =================================================
 
-renderer =
-    new THREE.WebGLRenderer({
+        createScene();
 
-        canvas: canvas,
-
-        context: gl,
-
-        alpha: true,
-
-        antialias: true,
-
-        preserveDrawingBuffer: true
-
-    });
-
-renderer.autoClear = false;
-
-renderer.setClearColor(
-    0x000000,
-    0
-);
-
-
-        renderer.autoClear = false;
+        createCube();
 
 
         // =================================================
-        // THREE.JS SCENE
+        // REQUEST AR SESSION
         // =================================================
 
-        scene =
-            new THREE.Scene();
-
-
-        // =================================================
-        // CAMERA
-        // =================================================
-
-        camera =
-            new THREE.PerspectiveCamera();
-
-
-        camera.matrixAutoUpdate =
-            false;
-
-
-        // =================================================
-        // LIGHT
-        // =================================================
-
-        const light =
-            new THREE.HemisphereLight(
-                0xffffff,
-                0xbbbbff,
-                3
-            );
-
-        scene.add(light);
-
-
-        // =================================================
-        // REQUEST XR SESSION
-        // =================================================
-
-        session =
+        xrSession =
             await navigator.xr.requestSession(
                 "immersive-ar",
                 {
+
                     requiredFeatures: [
                         "hit-test"
                     ],
@@ -200,100 +315,56 @@ renderer.setClearColor(
 
 
         // =================================================
-        // CREATE XR RENDERING LAYER
+        // GIVE SESSION TO THREE.JS
         // =================================================
 
-        const baseLayer =
-            new XRWebGLLayer(
-                session,
-                gl
-            );
-
-
-        session.updateRenderState({
-            baseLayer: baseLayer
-        });
+        await renderer.xr.setSession(
+            xrSession
+        );
 
 
         // =================================================
         // REFERENCE SPACE
         // =================================================
 
-        const referenceSpace =
-            await session.requestReferenceSpace(
+        localReferenceSpace =
+            await xrSession.requestReferenceSpace(
                 "local"
             );
 
 
         // =================================================
-        // VIEWER SPACE FOR HIT TEST
+        // VIEWER SPACE
         // =================================================
 
         const viewerSpace =
-            await session.requestReferenceSpace(
+            await xrSession.requestReferenceSpace(
                 "viewer"
             );
 
 
+        // =================================================
+        // HIT TEST SOURCE
+        // =================================================
+
         hitTestSource =
-            await session.requestHitTestSource({
+            await xrSession.requestHitTestSource({
                 space: viewerSpace
             });
 
 
         // =================================================
-        // CREATE RETICLE
+        // SCREEN TAP / SELECT
         // =================================================
 
-        const reticleGeometry =
-            new THREE.RingGeometry(
-                0.08,
-                0.1,
-                32
-            );
-
-
-        reticleGeometry.rotateX(
-            -Math.PI / 2
-        );
-
-
-        const reticleMaterial =
-            new THREE.MeshBasicMaterial({
-                color: 0x00ff00
-            });
-
-
-        reticle =
-            new THREE.Mesh(
-                reticleGeometry,
-                reticleMaterial
-            );
-
-
-        reticle.matrixAutoUpdate =
-            false;
-
-
-        reticle.visible =
-            false;
-
-
-        scene.add(reticle);
-
-
-        // =================================================
-        // SCREEN TAP
-        // =================================================
-
-        session.addEventListener(
+        xrSession.addEventListener(
             "select",
             placeCube
         );
 
 
         // =================================================
-        // HIDE START BUTTON
+        // UPDATE UI
         // =================================================
 
         startButton.style.display =
@@ -305,54 +376,28 @@ renderer.setClearColor(
 
 
         // =================================================
-        // XR FRAME LOOP
+        // XR RENDER LOOP
         // =================================================
 
-        session.requestAnimationFrame(
-            (time, frame) => {
-
-                onXRFrame(
-                    time,
-                    frame,
-                    referenceSpace
-                );
-
-            }
+        renderer.setAnimationLoop(
+            renderAR
         );
 
 
         // =================================================
-        // SESSION END
+        // AR SESSION END
         // =================================================
 
-        session.addEventListener(
+        xrSession.addEventListener(
             "end",
-            () => {
-
-                session = null;
-
-                hitTestSource = null;
-
-                hitTestSourceRequested =
-                    false;
-
-                startButton.style.display =
-                    "inline-block";
-
-                startButton.disabled =
-                    false;
-
-                status.textContent =
-                    "AR ended.";
-
-            }
+            handleSessionEnd
         );
 
 
     } catch (error) {
 
         console.error(
-            "AR ERROR:",
+            "AR START ERROR:",
             error
         );
 
@@ -367,102 +412,18 @@ renderer.setClearColor(
 
 
 // =====================================================
-// XR FRAME
+// AR RENDER LOOP
 // =====================================================
 
-function onXRFrame(
+function renderAR(
     time,
-    frame,
-    referenceSpace
+    frame
 ) {
 
-    session.requestAnimationFrame(
-        (nextTime, nextFrame) => {
-
-            onXRFrame(
-                nextTime,
-                nextFrame,
-                referenceSpace
-            );
-
-        }
-    );
-
-
-    const pose =
-        frame.getViewerPose(
-            referenceSpace
-        );
-
-
-    if (!pose) {
+    if (!frame || !xrSession) {
 
         return;
     }
-
-
-    // =================================================
-    // BIND XR FRAMEBUFFER
-    // =================================================
-
-    const baseLayer =
-        session.renderState.baseLayer;
-
-
-gl.bindFramebuffer(
-    gl.FRAMEBUFFER,
-    baseLayer.framebuffer
-);
-
-    // =================================================
-    // GET FIRST VIEW
-    // =================================================
-
-    const view =
-        pose.views[0];
-
-
-    const viewport =
-        baseLayer.getViewport(
-            view
-        );
-
-
-    renderer.setSize(
-        viewport.width,
-        viewport.height,
-        false
-    );
-
-
-    // =================================================
-    // UPDATE THREE CAMERA
-    // =================================================
-
-    camera.matrix.fromArray(
-        view.transform.matrix
-    );
-
-
-    camera.projectionMatrix.fromArray(
-        view.projectionMatrix
-    );
-
-    camera.updateMatrixWorld(true);
-
-    camera.matrixWorld.copy(
-        camera.matrix
-    );
-
-
-    camera.matrixWorldInverse
-        .copy(camera.matrixWorld)
-        .invert();
-
-
-    camera.updateMatrixWorld(
-        true
-    );
 
 
     // =================================================
@@ -487,7 +448,7 @@ gl.bindFramebuffer(
 
             const hitPose =
                 hit.getPose(
-                    referenceSpace
+                    localReferenceSpace
                 );
 
 
@@ -502,7 +463,8 @@ gl.bindFramebuffer(
                 );
 
 
-                if (!cube) {
+                if (!cube ||
+                    !cube.visible) {
 
                     status.textContent =
                         "🎯 SURFACE FOUND — TAP TO PLACE";
@@ -518,7 +480,7 @@ gl.bindFramebuffer(
 
 
     // =================================================
-    // RENDER
+    // RENDER SCENE
     // =================================================
 
     renderer.render(
@@ -536,51 +498,26 @@ function placeCube() {
 
     if (
         !reticle ||
-        !reticle.visible
+        !reticle.visible ||
+        !cube
     ) {
 
         return;
     }
 
 
-    // Create cube once
+    // Get position from reticle
 
-    if (!cube) {
-
-        const geometry =
-            new THREE.BoxGeometry(
-                0.15,
-                0.15,
-                0.15
-            );
-
-
-        const material =
-            new THREE.MeshStandardMaterial({
-                color: 0x00aaff
-            });
-
-
-        cube =
-            new THREE.Mesh(
-                geometry,
-                material
-            );
-
-
-        scene.add(cube);
-    }
-
-
-    // Put cube at reticle position
-
-    cube.matrix.copy(
+    cube.position.setFromMatrixPosition(
         reticle.matrix
     );
 
 
-    cube.matrixAutoUpdate =
-        false;
+    // Get orientation from reticle
+
+    cube.quaternion.setFromRotationMatrix(
+        reticle.matrix
+    );
 
 
     cube.visible =
@@ -593,7 +530,60 @@ function placeCube() {
 
 
 // =====================================================
-// BUTTON
+// HANDLE AR SESSION END
+// =====================================================
+
+function handleSessionEnd() {
+
+    if (renderer) {
+
+        renderer.setAnimationLoop(
+            null
+        );
+    }
+
+
+    xrSession =
+        null;
+
+
+    hitTestSource =
+        null;
+
+
+    localReferenceSpace =
+        null;
+
+
+    if (reticle) {
+
+        reticle.visible =
+            false;
+    }
+
+
+    if (cube) {
+
+        cube.visible =
+            false;
+    }
+
+
+    startButton.style.display =
+        "inline-block";
+
+
+    startButton.disabled =
+        false;
+
+
+    status.textContent =
+        "AR session ended.";
+}
+
+
+// =====================================================
+// START BUTTON
 // =====================================================
 
 startButton.addEventListener(
@@ -603,11 +593,11 @@ startButton.addEventListener(
 
 
 // =====================================================
-// INITIAL CHECK
+// INITIALIZE
 // =====================================================
 
 startButton.disabled =
     true;
 
 
-checkAR();
+checkARSupport();
