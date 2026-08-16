@@ -191,15 +191,13 @@ async function startCamera() {
 
                 video: {
 
-                    facingMode: "user",
-
-                    width: {
-                        ideal: 1280
-                    },
-
-                    height: {
-                        ideal: 720
-                    }
+    facingMode: "environment",
+    width: {
+        ideal: 1280
+    },
+    height: {
+        ideal: 720
+    }
                 },
 
                 audio: false
