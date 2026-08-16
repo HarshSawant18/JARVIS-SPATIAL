@@ -1,194 +1,214 @@
-import * as THREE from
-    "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js";
+import {
+    FilesetResolver,
+    HandLandmarker
+} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest";
 
+
+// =====================================================
+// ELEMENTS
+// =====================================================
+
+const video =
+    document.getElementById("camera");
+
+const canvas =
+    document.getElementById("overlay");
+
+const ctx =
+    canvas.getContext("2d");
 
 const startButton =
-    document.getElementById("startAR");
+    document.getElementById("startCamera");
 
 const status =
     document.getElementById("status");
 
 
-let session = null;
+// =====================================================
+// MEDIAPIPE
+// =====================================================
 
-let renderer = null;
+let handLandmarker = null;
 
-let scene = null;
+let cameraStarted = false;
 
-let camera = null;
+let lastVideoTime = -1;
 
 
 // =====================================================
-// CHECK AR
+// HAND CONNECTIONS
 // =====================================================
 
-async function checkAR() {
+const HAND_CONNECTIONS = [
 
-    if (!navigator.xr) {
+    [0, 1],
+    [1, 2],
+    [2, 3],
+    [3, 4],
 
-        status.textContent =
-            "WebXR is not available.";
+    [0, 5],
+    [5, 6],
+    [6, 7],
+    [7, 8],
 
-        startButton.disabled =
-            true;
+    [0, 9],
+    [9, 10],
+    [10, 11],
+    [11, 12],
 
-        return;
-    }
+    [0, 13],
+    [13, 14],
+    [14, 15],
+    [15, 16],
 
+    [0, 17],
+    [17, 18],
+    [18, 19],
+    [19, 20],
+
+    [5, 9],
+    [9, 13],
+    [13, 17]
+];
+
+
+// =====================================================
+// DISTANCE
+// =====================================================
+
+function distance(a, b) {
+
+    const dx =
+        a.x - b.x;
+
+    const dy =
+        a.y - b.y;
+
+    return Math.sqrt(
+        dx * dx +
+        dy * dy
+    );
+}
+
+
+// =====================================================
+// INITIALIZE MEDIAPIPE
+// =====================================================
+
+async function initializeHandTracking() {
 
     try {
 
-        const supported =
-            await navigator.xr.isSessionSupported(
-                "immersive-ar"
+        status.textContent =
+            "Loading hand tracking...";
+
+
+        const vision =
+            await FilesetResolver.forVisionTasks(
+
+                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
             );
 
 
-        if (supported) {
+        handLandmarker =
+            await HandLandmarker.createFromOptions(
 
-            status.textContent =
-                "🔥 AR READY";
+                vision,
 
-            startButton.disabled =
-                false;
+                {
 
-        } else {
+                    baseOptions: {
 
-            status.textContent =
-                "AR is not supported.";
+                        modelAssetPath:
+                            "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
 
-            startButton.disabled =
-                true;
-        }
+                    },
+
+                    runningMode:
+                        "VIDEO",
+
+                    numHands:
+                        2,
+
+                    minHandDetectionConfidence:
+                        0.5,
+
+                    minHandPresenceConfidence:
+                        0.5,
+
+                    minTrackingConfidence:
+                        0.5
+                }
+            );
+
+
+        status.textContent =
+            "✅ Hand tracking ready";
+
+        startButton.disabled =
+            false;
+
 
     } catch (error) {
 
         console.error(error);
 
         status.textContent =
-            "AR check failed.";
+            "❌ MediaPipe failed to load";
 
-        startButton.disabled =
-            true;
+        console.error(
+            "MediaPipe error:",
+            error
+        );
     }
 }
 
 
 // =====================================================
-// CREATE SCENE
+// START CAMERA
 // =====================================================
 
-function createScene() {
-
-    scene =
-        new THREE.Scene();
-
-
-    camera =
-        new THREE.PerspectiveCamera();
-
-
-    camera.matrixAutoUpdate =
-        false;
-
-
-    const light =
-        new THREE.HemisphereLight(
-            0xffffff,
-            0xbbbbff,
-            3
-        );
-
-
-    scene.add(light);
-}
-
-
-// =====================================================
-// START AR
-// =====================================================
-
-async function startAR() {
+async function startCamera() {
 
     try {
 
         status.textContent =
-            "Starting AR...";
+            "Requesting camera...";
 
 
-        createScene();
+        const stream =
+            await navigator.mediaDevices.getUserMedia({
 
+                video: {
 
-        renderer =
-            new THREE.WebGLRenderer({
+                    facingMode:
+                        "user",
 
-                antialias: true,
+                    width: {
+                        ideal: 1280
+                    },
 
-                alpha: true
+                    height: {
+                        ideal: 720
+                    }
+                },
+
+                audio: false
             });
 
 
-        renderer.setPixelRatio(
-            window.devicePixelRatio
-        );
+        video.srcObject =
+            stream;
 
 
-        renderer.setSize(
-            window.innerWidth,
-            window.innerHeight
-        );
+        await video.play();
 
 
-        renderer.setClearColor(
-            0x000000,
-            0
-        );
+        resizeCanvas();
 
 
-        renderer.xr.enabled =
+        cameraStarted =
             true;
-
-
-        renderer.xr.setReferenceSpaceType(
-            "local"
-        );
-
-
-        document.body.appendChild(
-            renderer.domElement
-        );
-
-
-        // =================================================
-        // REQUEST HAND TRACKING AS OPTIONAL FEATURE
-        // =================================================
-
-        session =
-            await navigator.xr.requestSession(
-
-                "immersive-ar",
-
-                {
-
-                    requiredFeatures: [
-                        "local"
-                    ],
-
-                    optionalFeatures: [
-                        "hand-tracking",
-                        "dom-overlay"
-                    ],
-
-                    domOverlay: {
-                        root: document.body
-                    }
-                }
-            );
-
-
-        await renderer.xr.setSession(
-            session
-        );
 
 
         startButton.style.display =
@@ -196,229 +216,356 @@ async function startAR() {
 
 
         status.textContent =
-            "📷 AR ACTIVE — checking hand tracking...";
+            "📷 Camera active — show your hands";
 
 
-        // =================================================
-        // SESSION EVENTS
-        // =================================================
-
-        session.addEventListener(
-            "inputsourceschange",
-            inspectInputSources
-        );
-
-
-        // =================================================
-        // INITIAL CHECK
-        // =================================================
-
-        inspectInputSources();
-
-
-        // =================================================
-        // XR LOOP
-        // =================================================
-
-        renderer.setAnimationLoop(
-            render
-        );
-
-
-        // =================================================
-        // SESSION END
-        // =================================================
-
-        session.addEventListener(
-            "end",
-            () => {
-
-                if (renderer) {
-
-                    renderer.setAnimationLoop(
-                        null
-                    );
-                }
-
-
-                session =
-                    null;
-
-
-                startButton.style.display =
-                    "inline-block";
-
-
-                startButton.disabled =
-                    false;
-
-
-                status.textContent =
-                    "AR ended.";
-            }
+        requestAnimationFrame(
+            detectHands
         );
 
 
     } catch (error) {
 
-        console.error(
-            "AR ERROR:",
-            error
-        );
-
+        console.error(error);
 
         status.textContent =
-            "❌ " +
-            error.name +
-            ": " +
-            error.message;
+            "❌ Camera error: " +
+            error.name;
+
     }
 }
 
 
 // =====================================================
-// INSPECT XR INPUT SOURCES
+// RESIZE CANVAS
 // =====================================================
 
-function inspectInputSources() {
+function resizeCanvas() {
 
-    if (!session) {
-
-        return;
-    }
-
-
-    const sources =
-        session.inputSources;
-
-
-    console.log(
-        "XR INPUT SOURCES:",
-        sources
-    );
-
-
-    // -------------------------------------------------
-    // No input sources
-    // -------------------------------------------------
-
-    if (!sources || sources.length === 0) {
-
-        status.textContent =
-            "⚠️ AR works, but NO XR input source detected.";
+    if (!video.videoWidth) {
 
         return;
     }
 
 
-    let handCount =
-        0;
+    canvas.width =
+        video.videoWidth;
 
-    let screenCount =
-        0;
+    canvas.height =
+        video.videoHeight;
+}
 
-    let controllerCount =
-        0;
+
+// =====================================================
+// DRAW HAND
+// =====================================================
+
+function drawHand(landmarks) {
+
+    const width =
+        canvas.width;
+
+    const height =
+        canvas.height;
+
+
+    // -------------------------------------------------
+    // Draw bones
+    // -------------------------------------------------
+
+    ctx.strokeStyle =
+        "#00ffff";
+
+    ctx.lineWidth =
+        3;
 
 
     for (
-        const source of sources
+        const [start, end]
+        of HAND_CONNECTIONS
     ) {
 
-        console.log(
-            "XR SOURCE:",
-            {
-                handedness:
-                    source.handedness,
+        const a =
+            landmarks[start];
 
-                targetRayMode:
-                    source.targetRayMode,
+        const b =
+            landmarks[end];
 
-                hand:
-                    source.hand
-            }
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+
+            a.x * width,
+
+            a.y * height
         );
 
 
-        if (source.hand) {
+        ctx.lineTo(
 
-            handCount++;
+            b.x * width,
 
-        } else if (
-            source.targetRayMode ===
-            "screen"
+            b.y * height
+        );
+
+
+        ctx.stroke();
+    }
+
+
+    // -------------------------------------------------
+    // Draw landmarks
+    // -------------------------------------------------
+
+    for (
+        const point
+        of landmarks
+    ) {
+
+        ctx.beginPath();
+
+
+        ctx.arc(
+
+            point.x * width,
+
+            point.y * height,
+
+            6,
+
+            0,
+
+            Math.PI * 2
+        );
+
+
+        ctx.fillStyle =
+            "#ffffff";
+
+
+        ctx.fill();
+    }
+
+
+    // -------------------------------------------------
+    // Pinch
+    // -------------------------------------------------
+
+    const thumb =
+        landmarks[4];
+
+    const index =
+        landmarks[8];
+
+
+    const pinchDistance =
+        distance(
+            thumb,
+            index
+        );
+
+
+    const pinch =
+        pinchDistance < 0.06;
+
+
+    // Draw thumb-index connection
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+
+        thumb.x * width,
+
+        thumb.y * height
+    );
+
+    ctx.lineTo(
+
+        index.x * width,
+
+        index.y * height
+    );
+
+    ctx.strokeStyle =
+        pinch
+            ? "#00ff00"
+            : "#ff00ff";
+
+    ctx.lineWidth =
+        5;
+
+    ctx.stroke();
+
+
+    // Pinch point
+
+    const pinchX =
+        (
+            thumb.x +
+            index.x
+        ) / 2;
+
+
+    const pinchY =
+        (
+            thumb.y +
+            index.y
+        ) / 2;
+
+
+    ctx.beginPath();
+
+    ctx.arc(
+
+        pinchX * width,
+
+        pinchY * height,
+
+        pinch
+            ? 15
+            : 8,
+
+        0,
+
+        Math.PI * 2
+    );
+
+
+    ctx.fillStyle =
+        pinch
+            ? "#00ff00"
+            : "#ff00ff";
+
+
+    ctx.fill();
+
+
+    return pinch;
+}
+
+
+// =====================================================
+// DETECT HANDS
+// =====================================================
+
+async function detectHands() {
+
+    if (
+        !cameraStarted ||
+        !handLandmarker
+    ) {
+
+        return;
+    }
+
+
+    resizeCanvas();
+
+
+    if (
+        video.readyState >= 2 &&
+        video.currentTime !== lastVideoTime
+    ) {
+
+        lastVideoTime =
+            video.currentTime;
+
+
+        const results =
+            handLandmarker.detectForVideo(
+
+                video,
+
+                performance.now()
+            );
+
+
+        // Clear overlay
+
+        ctx.clearRect(
+
+            0,
+
+            0,
+
+            canvas.width,
+
+            canvas.height
+        );
+
+
+        const hands =
+            results.landmarks || [];
+
+
+        // -------------------------------------------------
+        // No hands
+        // -------------------------------------------------
+
+        if (hands.length === 0) {
+
+            status.textContent =
+                "🖐️ Show your hand";
+        }
+
+
+        // -------------------------------------------------
+        // Draw hands
+        // -------------------------------------------------
+
+        let pinchCount =
+            0;
+
+
+        for (
+            const hand
+            of hands
         ) {
 
-            screenCount++;
+            const isPinching =
+                drawHand(hand);
 
-        } else {
 
-            controllerCount++;
+            if (isPinching) {
+
+                pinchCount++;
+            }
+        }
+
+
+        // -------------------------------------------------
+        // Status
+        // -------------------------------------------------
+
+        if (hands.length > 0) {
+
+            if (pinchCount === 2) {
+
+                status.textContent =
+                    "🔥 TWO HANDS — BOTH PINCHING";
+
+            } else if (pinchCount === 1) {
+
+                status.textContent =
+                    "🤏 PINCH DETECTED";
+
+            } else {
+
+                status.textContent =
+                    `✋ ${hands.length} HAND${
+                        hands.length > 1
+                            ? "S"
+                            : ""
+                    } DETECTED`;
+            }
         }
     }
 
 
-    // -------------------------------------------------
-    // HAND TRACKING FOUND
-    // -------------------------------------------------
-
-    if (handCount > 0) {
-
-        status.textContent =
-            "🔥 HAND TRACKING DETECTED: " +
-            handCount;
-
-        return;
-    }
-
-
-    // -------------------------------------------------
-    // ONLY SCREEN INPUT
-    // -------------------------------------------------
-
-    if (screenCount > 0) {
-
-        status.textContent =
-            "📱 SCREEN INPUT ONLY — no hand tracking.";
-
-        return;
-    }
-
-
-    // -------------------------------------------------
-    // OTHER INPUT
-    // -------------------------------------------------
-
-    status.textContent =
-        "🎮 XR INPUT FOUND, but no hand input.";
-}
-
-
-// =====================================================
-// XR RENDER
-// =====================================================
-
-function render(
-    time,
-    frame
-) {
-
-    if (!frame) {
-
-        return;
-    }
-
-
-    // Keep checking input sources
-    // because they can change during
-    // the AR session.
-
-    inspectInputSources();
-
-
-    renderer.render(
-        scene,
-        camera
+    requestAnimationFrame(
+        detectHands
     );
 }
 
@@ -428,16 +575,19 @@ function render(
 // =====================================================
 
 startButton.addEventListener(
+
     "click",
-    startAR
+
+    startCamera
 );
 
 
 // =====================================================
-// INITIAL CHECK
+// INITIALIZE
 // =====================================================
 
 startButton.disabled =
     true;
 
-checkAR();
+
+initializeHandTracking();
