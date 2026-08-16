@@ -10,7 +10,7 @@
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>JARVIS Hand Test</title>
+    <title>JARVIS Hand Tracking</title>
 
     <style>
 
@@ -18,36 +18,72 @@
             box-sizing: border-box;
         }
 
+        html,
         body {
             margin: 0;
+            padding: 0;
+
+            width: 100%;
+            height: 100%;
+
             overflow: hidden;
+
             background: #000;
+
             font-family: Arial, sans-serif;
         }
 
+        /* =========================================
+           CAMERA
+           ========================================= */
+
         #camera {
+
             position: fixed;
-            inset: 0;
+
+            top: 0;
+            left: 0;
 
             width: 100%;
             height: 100%;
 
             object-fit: cover;
 
+            /* Selfie mirror */
             transform: scaleX(-1);
         }
 
+
+        /* =========================================
+           HAND OVERLAY
+           ========================================= */
+
         #overlay {
+
             position: fixed;
-            inset: 0;
+
+            top: 0;
+            left: 0;
 
             width: 100%;
             height: 100%;
 
             pointer-events: none;
+
+            /* IMPORTANT:
+               Mirror the landmark canvas
+               exactly like the camera.
+            */
+            transform: scaleX(-1);
         }
 
+
+        /* =========================================
+           UI
+           ========================================= */
+
         #ui {
+
             position: fixed;
 
             top: 20px;
@@ -62,7 +98,9 @@
             pointer-events: none;
         }
 
+
         #status {
+
             display: inline-block;
 
             color: white;
@@ -76,7 +114,9 @@
             font-size: 16px;
         }
 
+
         #startCamera {
+
             margin-top: 12px;
 
             padding: 14px 24px;
@@ -92,10 +132,17 @@
             pointer-events: auto;
         }
 
+
+        /* =========================================
+           INFO
+           ========================================= */
+
         #info {
+
             position: fixed;
 
             bottom: 20px;
+
             left: 20px;
             right: 20px;
 
@@ -110,13 +157,19 @@
             text-align: center;
 
             font-size: 14px;
+
+            z-index: 10;
         }
 
     </style>
 
 </head>
 
+
 <body>
+
+
+    <!-- CAMERA -->
 
     <video
         id="camera"
@@ -125,9 +178,15 @@
         muted
     ></video>
 
+
+    <!-- HAND LANDMARKS -->
+
     <canvas
         id="overlay"
     ></canvas>
+
+
+    <!-- UI -->
 
     <div id="ui">
 
@@ -137,18 +196,31 @@
 
         <br>
 
-        <button id="startCamera">
+        <button
+            id="startCamera"
+        >
             START HAND TRACKING
         </button>
 
     </div>
 
+
     <div id="info">
+
         Show one or two hands to the camera.
-        Bring thumb + index finger together to test pinch.
+        <br>
+
+        Bring your thumb and index finger
+        together to test pinch.
+
     </div>
 
-    <script type="module" src="./app.js"></script>
+
+    <script
+        type="module"
+        src="./app.js"
+    ></script>
+
 
 </body>
 
