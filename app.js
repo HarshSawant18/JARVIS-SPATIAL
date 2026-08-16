@@ -2,44 +2,36 @@ import * as THREE from
     "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js";
 
 
-const startButton =
-    document.getElementById("startAR");
+const startButton = document.getElementById("startAR");
+const status = document.getElementById("status");
 
-const status =
-    document.getElementById("status");
-
-
-let camera;
-let scene;
-let renderer;
-
-let controller;
-
-let reticle;
+let session = null;
+let renderer = null;
+let scene = null;
+let camera = null;
 
 let hitTestSource = null;
-
 let hitTestSourceRequested = false;
 
+let reticle = null;
 let cube = null;
 
 
-// ======================================================
-// CHECK WEBXR
-// ======================================================
+// =====================================================
+// CHECK AR SUPPORT
+// =====================================================
 
 async function checkAR() {
 
     if (!navigator.xr) {
 
         status.textContent =
-            "WebXR not available";
+            "WebXR is not available.";
 
         startButton.disabled = true;
 
         return;
     }
-
 
     try {
 
@@ -48,7 +40,6 @@ async function checkAR() {
                 "immersive-ar"
             );
 
-
         if (supported) {
 
             status.textContent =
@@ -56,31 +47,29 @@ async function checkAR() {
 
             startButton.disabled = false;
 
-        }
-        else {
+        } else {
 
             status.textContent =
-                "AR not supported";
+                "AR is not supported.";
 
             startButton.disabled = true;
         }
 
-    }
-    catch (error) {
+    } catch (error) {
 
         console.error(error);
 
         status.textContent =
-            "AR check failed";
+            "AR check failed.";
 
         startButton.disabled = true;
     }
 }
 
 
-// ======================================================
+// =====================================================
 // START AR
-// ======================================================
+// =====================================================
 
 async function startAR() {
 
@@ -90,63 +79,85 @@ async function startAR() {
             "Starting AR...";
 
 
-        const session =
-            await navigator.xr.requestSession(
-                "immersive-ar",
+        // =================================================
+        // CANVAS
+        // =================================================
+
+        const canvas =
+            document.createElement("canvas");
+
+        document.body.appendChild(canvas);
+
+
+        // =================================================
+        // WEBGL CONTEXT
+        // =================================================
+
+        const gl =
+            canvas.getContext(
+                "webgl",
                 {
-                    requiredFeatures: [
-                        "hit-test"
-                    ],
-                    optionalFeatures: [
-                        "dom-overlay"
-                    ],
-                    domOverlay: {
-                        root: document.body
-                    }
+                    xrCompatible: true,
+                    alpha: true,
+                    antialias: true
                 }
             );
 
 
-        // ----------------------------------------------
-        // THREE.JS
-        // ----------------------------------------------
+        if (!gl) {
 
-        scene = new THREE.Scene();
+            throw new Error(
+                "WebGL could not be created."
+            );
+        }
 
+
+        // =================================================
+        // THREE.JS RENDERER
+        // =================================================
+
+        renderer =
+            new THREE.WebGLRenderer({
+
+                canvas: canvas,
+
+                context: gl,
+
+                alpha: true,
+
+                antialias: true,
+
+                preserveDrawingBuffer: true
+
+            });
+
+
+        renderer.autoClear = false;
+
+
+        // =================================================
+        // THREE.JS SCENE
+        // =================================================
+
+        scene =
+            new THREE.Scene();
+
+
+        // =================================================
+        // CAMERA
+        // =================================================
 
         camera =
             new THREE.PerspectiveCamera();
 
 
-        renderer =
-            new THREE.WebGLRenderer({
-                alpha: true,
-                antialias: true
-            });
+        camera.matrixAutoUpdate =
+            false;
 
 
-        renderer.setPixelRatio(
-            window.devicePixelRatio
-        );
-
-
-        renderer.setSize(
-            window.innerWidth,
-            window.innerHeight
-        );
-
-
-        renderer.xr.enabled = true;
-
-
-        document.body.appendChild(
-            renderer.domElement
-        );
-
-
-        // ----------------------------------------------
+        // =================================================
         // LIGHT
-        // ----------------------------------------------
+        // =================================================
 
         const light =
             new THREE.HemisphereLight(
@@ -155,15 +166,79 @@ async function startAR() {
                 3
             );
 
-
         scene.add(light);
 
 
-        // ----------------------------------------------
-        // RETICLE
-        // ----------------------------------------------
+        // =================================================
+        // REQUEST XR SESSION
+        // =================================================
 
-        const ringGeometry =
+        session =
+            await navigator.xr.requestSession(
+                "immersive-ar",
+                {
+                    requiredFeatures: [
+                        "hit-test"
+                    ],
+
+                    optionalFeatures: [
+                        "dom-overlay"
+                    ],
+
+                    domOverlay: {
+                        root: document.body
+                    }
+                }
+            );
+
+
+        // =================================================
+        // CREATE XR RENDERING LAYER
+        // =================================================
+
+        const baseLayer =
+            new XRWebGLLayer(
+                session,
+                gl
+            );
+
+
+        session.updateRenderState({
+            baseLayer: baseLayer
+        });
+
+
+        // =================================================
+        // REFERENCE SPACE
+        // =================================================
+
+        const referenceSpace =
+            await session.requestReferenceSpace(
+                "local"
+            );
+
+
+        // =================================================
+        // VIEWER SPACE FOR HIT TEST
+        // =================================================
+
+        const viewerSpace =
+            await session.requestReferenceSpace(
+                "viewer"
+            );
+
+
+        hitTestSource =
+            await session.requestHitTestSource({
+                space: viewerSpace
+            });
+
+
+        // =================================================
+        // CREATE RETICLE
+        // =================================================
+
+        const reticleGeometry =
             new THREE.RingGeometry(
                 0.08,
                 0.1,
@@ -171,12 +246,12 @@ async function startAR() {
             );
 
 
-        ringGeometry.rotateX(
+        reticleGeometry.rotateX(
             -Math.PI / 2
         );
 
 
-        const ringMaterial =
+        const reticleMaterial =
             new THREE.MeshBasicMaterial({
                 color: 0x00ff00
             });
@@ -184,8 +259,8 @@ async function startAR() {
 
         reticle =
             new THREE.Mesh(
-                ringGeometry,
-                ringMaterial
+                reticleGeometry,
+                reticleMaterial
             );
 
 
@@ -200,52 +275,19 @@ async function startAR() {
         scene.add(reticle);
 
 
-        // ----------------------------------------------
-        // CONTROLLER
-        // ----------------------------------------------
+        // =================================================
+        // SCREEN TAP
+        // =================================================
 
-        controller =
-            renderer.xr.getController(0);
-
-
-        controller.addEventListener(
+        session.addEventListener(
             "select",
             placeCube
         );
 
 
-        scene.add(controller);
-
-
-        // ----------------------------------------------
-        // START XR
-        // ----------------------------------------------
-
-        renderer.xr.setSession(
-            session
-        );
-
-
-        session.addEventListener(
-            "end",
-            () => {
-
-                status.textContent =
-                    "AR ended";
-
-                hitTestSource = null;
-
-                hitTestSourceRequested =
-                    false;
-
-                startButton.disabled =
-                    false;
-
-                startButton.textContent =
-                    "START AR";
-            }
-        );
-
+        // =================================================
+        // HIDE START BUTTON
+        // =================================================
 
         startButton.style.display =
             "none";
@@ -255,29 +297,232 @@ async function startAR() {
             "📷 AR ACTIVE — move your phone slowly";
 
 
-        renderer.setAnimationLoop(
-            render
+        // =================================================
+        // XR FRAME LOOP
+        // =================================================
+
+        session.requestAnimationFrame(
+            (time, frame) => {
+
+                onXRFrame(
+                    time,
+                    frame,
+                    referenceSpace
+                );
+
+            }
         );
 
-    }
-    catch (error) {
+
+        // =================================================
+        // SESSION END
+        // =================================================
+
+        session.addEventListener(
+            "end",
+            () => {
+
+                session = null;
+
+                hitTestSource = null;
+
+                hitTestSourceRequested =
+                    false;
+
+                startButton.style.display =
+                    "inline-block";
+
+                startButton.disabled =
+                    false;
+
+                status.textContent =
+                    "AR ended.";
+
+            }
+        );
+
+
+    } catch (error) {
 
         console.error(
-            "AR START ERROR:",
+            "AR ERROR:",
             error
         );
 
 
         status.textContent =
-            "❌ " + error.name +
-            ": " + error.message;
+            "❌ " +
+            error.name +
+            ": " +
+            error.message;
     }
 }
 
 
-// ======================================================
+// =====================================================
+// XR FRAME
+// =====================================================
+
+function onXRFrame(
+    time,
+    frame,
+    referenceSpace
+) {
+
+    session.requestAnimationFrame(
+        (nextTime, nextFrame) => {
+
+            onXRFrame(
+                nextTime,
+                nextFrame,
+                referenceSpace
+            );
+
+        }
+    );
+
+
+    const pose =
+        frame.getViewerPose(
+            referenceSpace
+        );
+
+
+    if (!pose) {
+
+        return;
+    }
+
+
+    // =================================================
+    // BIND XR FRAMEBUFFER
+    // =================================================
+
+    const baseLayer =
+        session.renderState.baseLayer;
+
+
+    renderer.setFramebuffer(
+        baseLayer.framebuffer
+    );
+
+
+    // =================================================
+    // GET FIRST VIEW
+    // =================================================
+
+    const view =
+        pose.views[0];
+
+
+    const viewport =
+        baseLayer.getViewport(
+            view
+        );
+
+
+    renderer.setSize(
+        viewport.width,
+        viewport.height,
+        false
+    );
+
+
+    // =================================================
+    // UPDATE THREE CAMERA
+    // =================================================
+
+    camera.matrix.fromArray(
+        view.transform.matrix
+    );
+
+
+    camera.projectionMatrix.fromArray(
+        view.projectionMatrix
+    );
+
+
+    camera.matrixWorld.copy(
+        camera.matrix
+    );
+
+
+    camera.matrixWorldInverse
+        .copy(camera.matrixWorld)
+        .invert();
+
+
+    camera.updateMatrixWorld(
+        true
+    );
+
+
+    // =================================================
+    // HIT TEST
+    // =================================================
+
+    if (hitTestSource) {
+
+        const hitTestResults =
+            frame.getHitTestResults(
+                hitTestSource
+            );
+
+
+        if (
+            hitTestResults.length > 0
+        ) {
+
+            const hit =
+                hitTestResults[0];
+
+
+            const hitPose =
+                hit.getPose(
+                    referenceSpace
+                );
+
+
+            if (hitPose) {
+
+                reticle.visible =
+                    true;
+
+
+                reticle.matrix.fromArray(
+                    hitPose.transform.matrix
+                );
+
+
+                if (!cube) {
+
+                    status.textContent =
+                        "🎯 SURFACE FOUND — TAP TO PLACE";
+                }
+            }
+
+        } else {
+
+            reticle.visible =
+                false;
+        }
+    }
+
+
+    // =================================================
+    // RENDER
+    // =================================================
+
+    renderer.render(
+        scene,
+        camera
+    );
+}
+
+
+// =====================================================
 // PLACE CUBE
-// ======================================================
+// =====================================================
 
 function placeCube() {
 
@@ -290,8 +535,7 @@ function placeCube() {
     }
 
 
-    // If cube doesn't exist,
-    // create it.
+    // Create cube once
 
     if (!cube) {
 
@@ -320,15 +564,19 @@ function placeCube() {
     }
 
 
-    // Put cube exactly where
-    // the reticle detected the surface.
+    // Put cube at reticle position
 
-    cube.position.setFromMatrixPosition(
+    cube.matrix.copy(
         reticle.matrix
     );
 
 
-    cube.visible = true;
+    cube.matrixAutoUpdate =
+        false;
+
+
+    cube.visible =
+        true;
 
 
     status.textContent =
@@ -336,120 +584,9 @@ function placeCube() {
 }
 
 
-// ======================================================
-// RENDER LOOP
-// ======================================================
-
-function render(
-    timestamp,
-    frame
-) {
-
-    if (!frame) {
-
-        return;
-    }
-
-
-    const session =
-        renderer.xr.getSession();
-
-
-    // ----------------------------------------------
-    // HIT TEST
-    // ----------------------------------------------
-
-    if (!hitTestSourceRequested) {
-
-        session.requestReferenceSpace(
-            "viewer"
-        )
-        .then(
-            viewerSpace => {
-
-                session.requestHitTestSource({
-                    space: viewerSpace
-                })
-                .then(
-                    source => {
-
-                        hitTestSource =
-                            source;
-                    }
-                );
-
-            }
-        );
-
-
-        hitTestSourceRequested =
-            true;
-    }
-
-
-    if (hitTestSource) {
-
-        const referenceSpace =
-            renderer.xr.getReferenceSpace();
-
-
-        const hitTestResults =
-            frame.getHitTestResults(
-                hitTestSource
-            );
-
-
-        if (
-            hitTestResults.length > 0
-        ) {
-
-            const hit =
-                hitTestResults[0];
-
-
-            const pose =
-                hit.getPose(
-                    referenceSpace
-                );
-
-
-            if (pose) {
-
-                reticle.visible =
-                    true;
-
-
-                reticle.matrix.fromArray(
-                    pose.transform.matrix
-                );
-
-
-                if (!cube) {
-
-                    status.textContent =
-                        "🎯 SURFACE FOUND — TAP TO PLACE";
-                }
-            }
-
-        }
-        else {
-
-            reticle.visible =
-                false;
-        }
-    }
-
-
-    renderer.render(
-        scene,
-        camera
-    );
-}
-
-
-// ======================================================
+// =====================================================
 // BUTTON
-// ======================================================
+// =====================================================
 
 startButton.addEventListener(
     "click",
@@ -457,9 +594,9 @@ startButton.addEventListener(
 );
 
 
-// ======================================================
-// START CHECK
-// ======================================================
+// =====================================================
+// INITIAL CHECK
+// =====================================================
 
 startButton.disabled =
     true;
