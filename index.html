@@ -10,7 +10,7 @@
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>JARVIS Hand Tracking</title>
+    <title>JARVIS Rear Camera Hand Tracking</title>
 
     <style>
 
@@ -20,6 +20,7 @@
 
         html,
         body {
+
             margin: 0;
             padding: 0;
 
@@ -33,8 +34,9 @@
             font-family: Arial, sans-serif;
         }
 
+
         /* =========================================
-           CAMERA
+           REAR CAMERA
            ========================================= */
 
         #camera {
@@ -49,13 +51,14 @@
 
             object-fit: cover;
 
-            /* Selfie mirror */
-            transform: scaleX(-1);
+            /* IMPORTANT:
+               Rear camera is NOT mirrored.
+            */
         }
 
 
         /* =========================================
-           HAND OVERLAY
+           HAND LANDMARK OVERLAY
            ========================================= */
 
         #overlay {
@@ -71,15 +74,13 @@
             pointer-events: none;
 
             /* IMPORTANT:
-               Mirror the landmark canvas
-               exactly like the camera.
+               No mirror for rear camera.
             */
-            transform: scaleX(-1);
         }
 
 
         /* =========================================
-           UI
+           TOP UI
            ========================================= */
 
         #ui {
@@ -134,7 +135,7 @@
 
 
         /* =========================================
-           INFO
+           BOTTOM INFO
            ========================================= */
 
         #info {
@@ -169,7 +170,9 @@
 <body>
 
 
-    <!-- CAMERA -->
+    <!-- =========================================
+         CAMERA
+         ========================================= -->
 
     <video
         id="camera"
@@ -179,14 +182,18 @@
     ></video>
 
 
-    <!-- HAND LANDMARKS -->
+    <!-- =========================================
+         HAND LANDMARKS
+         ========================================= -->
 
     <canvas
         id="overlay"
     ></canvas>
 
 
-    <!-- UI -->
+    <!-- =========================================
+         UI
+         ========================================= -->
 
     <div id="ui">
 
@@ -207,11 +214,16 @@
 
     <div id="info">
 
-        Show one or two hands to the camera.
+        Rear camera hand tracking
+
         <br>
 
-        Bring your thumb and index finger
-        together to test pinch.
+        Move your hand left/right and verify
+        the landmarks follow it correctly.
+
+        <br>
+
+        🤏 Thumb + index = pinch
 
     </div>
 
