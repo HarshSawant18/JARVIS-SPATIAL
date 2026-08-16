@@ -1,46 +1,27 @@
 import * as THREE from
     "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js";
 
-
-// =====================================================
-// UI
-// =====================================================
-
-const startButton =
-    document.getElementById("startAR");
-
-const status =
-    document.getElementById("status");
-
-
-// =====================================================
-// THREE.JS
-// =====================================================
+const startButton = document.getElementById("startAR");
+const status = document.getElementById("status");
 
 let renderer = null;
 let scene = null;
 let camera = null;
 
-
-// =====================================================
-// WEBXR
-// =====================================================
-
 let xrSession = null;
 let localReferenceSpace = null;
+let viewerSpace = null;
 let hitTestSource = null;
-
-
-// =====================================================
-// OBJECTS
-// =====================================================
 
 let reticle = null;
 let cube = null;
+let cubeAnchor = null;
+
+let currentHit = null;
 
 
 // =====================================================
-// CHECK AR
+// CHECK AR SUPPORT
 // =====================================================
 
 async function checkARSupport() {
@@ -48,7 +29,7 @@ async function checkARSupport() {
     if (!navigator.xr) {
 
         status.textContent =
-            "WebXR is not available.";
+            "❌ WebXR is not available.";
 
         startButton.disabled = true;
 
@@ -82,7 +63,7 @@ async function checkARSupport() {
         console.error(error);
 
         status.textContent =
-            "❌ AR check failed.";
+            "❌ AR support check failed.";
 
         startButton.disabled = true;
     }
@@ -97,17 +78,10 @@ function createScene() {
 
     scene = new THREE.Scene();
 
-
-    // Camera
-
-    camera =
-        new THREE.PerspectiveCamera();
-
+    camera = new THREE.PerspectiveCamera();
 
     camera.matrixAutoUpdate = false;
 
-
-    // Light
 
     const light =
         new THREE.HemisphereLight(
@@ -119,9 +93,7 @@ function createScene() {
     scene.add(light);
 
 
-    // -------------------------------------------------
-    // RETICLE
-    // -------------------------------------------------
+    // Reticle
 
     const reticleGeometry =
         new THREE.RingGeometry(
@@ -147,11 +119,9 @@ function createScene() {
             reticleMaterial
         );
 
-
     reticle.matrixAutoUpdate = false;
 
     reticle.visible = false;
-
 
     scene.add(reticle);
 }
@@ -174,8 +144,8 @@ function createCube() {
     const material =
         new THREE.MeshStandardMaterial({
             color: 0x00aaff,
-            roughness: 0.3,
-            metalness: 0.4
+            roughness: 0.30,
+            metalness: 0.40
         });
 
 
@@ -185,9 +155,9 @@ function createCube() {
             material
         );
 
+    cube.matrixAutoUpdate = false;
 
     cube.visible = false;
-
 
     scene.add(cube);
 }
@@ -205,18 +175,12 @@ async function startAR() {
             "Starting AR...";
 
 
-        // -------------------------------------------------
-        // Scene
-        // -------------------------------------------------
-
         createScene();
 
         createCube();
 
 
-        // -------------------------------------------------
         // Renderer
-        // -------------------------------------------------
 
         renderer =
             new THREE.WebGLRenderer({
@@ -244,15 +208,17 @@ async function startAR() {
 
         renderer.xr.enabled = true;
 
+        renderer.xr.setReferenceSpaceType(
+            "local"
+        );
+
 
         document.body.appendChild(
             renderer.domElement
         );
 
 
-        // -------------------------------------------------
-        // AR Session
-        // -------------------------------------------------
+        // XR session
 
         xrSession =
             await navigator.xr.requestSession(
@@ -260,11 +226,14 @@ async function startAR() {
                 {
                     requiredFeatures: [
                         "local",
-                        "hit-test"
+                        "hit-test",
+                        "anchors"
                     ],
+
                     optionalFeatures: [
                         "dom-overlay"
                     ],
+
                     domOverlay: {
                         root: document.body
                     }
@@ -272,18 +241,12 @@ async function startAR() {
             );
 
 
-        // -------------------------------------------------
-        // Give session to Three.js
-        // -------------------------------------------------
-
         await renderer.xr.setSession(
             xrSession
         );
 
 
-        // -------------------------------------------------
-        // Reference space
-        // -------------------------------------------------
+        // Reference spaces
 
         localReferenceSpace =
             await xrSession.requestReferenceSpace(
@@ -291,19 +254,13 @@ async function startAR() {
             );
 
 
-        // -------------------------------------------------
-        // Viewer space
-        // -------------------------------------------------
-
-        const viewerSpace =
+        viewerSpace =
             await xrSession.requestReferenceSpace(
                 "viewer"
             );
 
 
-        // -------------------------------------------------
-        // Hit test source
-        // -------------------------------------------------
+        // Hit test
 
         hitTestSource =
             await xrSession.requestHitTestSource({
@@ -311,9 +268,13 @@ async function startAR() {
             });
 
 
-        // -------------------------------------------------
-        // UI
-        // -------------------------------------------------
+        // Screen tap
+
+        xrSession.addEventListener(
+            "select",
+            handleSelect
+        );
+
 
         startButton.style.display =
             "none";
@@ -323,51 +284,21 @@ async function startAR() {
             "📷 Move your phone slowly around the room";
 
 
-        // -------------------------------------------------
-        // XR LOOP
-        // -------------------------------------------------
-
         renderer.setAnimationLoop(
             renderAR
         );
 
 
-        // -------------------------------------------------
-        // END SESSION
-        // -------------------------------------------------
-
         xrSession.addEventListener(
             "end",
-            () => {
-
-                renderer.setAnimationLoop(null);
-
-                xrSession = null;
-
-                hitTestSource = null;
-
-                localReferenceSpace = null;
-
-                if (reticle) {
-                    reticle.visible = false;
-                }
-
-                startButton.style.display =
-                    "inline-block";
-
-                startButton.disabled =
-                    false;
-
-                status.textContent =
-                    "AR ended.";
-            }
+            handleSessionEnd
         );
 
 
     } catch (error) {
 
         console.error(
-            "AR ERROR:",
+            "AR START ERROR:",
             error
         );
 
@@ -382,7 +313,7 @@ async function startAR() {
 
 
 // =====================================================
-// AR FRAME LOOP
+// AR FRAME
 // =====================================================
 
 function renderAR(
@@ -400,61 +331,71 @@ function renderAR(
 
 
     // -------------------------------------------------
+    // Update cube from anchor
+    // -------------------------------------------------
+
+    if (cubeAnchor) {
+
+        const anchorPose =
+            frame.getPose(
+                cubeAnchor.anchorSpace,
+                localReferenceSpace
+            );
+
+
+        if (anchorPose) {
+
+            cube.matrix.fromArray(
+                anchorPose.transform.matrix
+            );
+
+
+            cube.visible = true;
+        }
+    }
+
+
+    // -------------------------------------------------
     // Hit test
     // -------------------------------------------------
 
+    currentHit = null;
+
+
     if (hitTestSource) {
 
-        const results =
+        const hitResults =
             frame.getHitTestResults(
                 hitTestSource
             );
 
 
-        if (results.length > 0) {
+        if (hitResults.length > 0) {
 
-            const hit =
-                results[0];
+            currentHit =
+                hitResults[0];
 
 
-            const pose =
-                hit.getPose(
+            const hitPose =
+                currentHit.getPose(
                     localReferenceSpace
                 );
 
 
-            if (pose) {
-
-                // Show reticle
+            if (hitPose) {
 
                 reticle.visible = true;
 
 
                 reticle.matrix.fromArray(
-                    pose.transform.matrix
+                    hitPose.transform.matrix
                 );
 
 
-                // -------------------------------------------------
-                // AUTO PLACE CUBE
-                // -------------------------------------------------
-
                 if (!cube.visible) {
 
-                    cube.matrix.fromArray(
-                        pose.transform.matrix
-                    );
-
-
-                    cube.matrixAutoUpdate =
-                        false;
-
-
-                    cube.visible = true;
-
-
                     status.textContent =
-                        "🧊 CUBE PLACED — MOVE YOUR PHONE";
+                        "🎯 SURFACE FOUND — TAP TO PLACE";
                 }
             }
 
@@ -472,14 +413,159 @@ function renderAR(
     }
 
 
-    // -------------------------------------------------
-    // Render
-    // -------------------------------------------------
-
     renderer.render(
         scene,
         camera
     );
+}
+
+
+// =====================================================
+// SCREEN TAP
+// =====================================================
+
+async function handleSelect() {
+
+    if (
+        !currentHit ||
+        !reticle ||
+        !reticle.visible
+    ) {
+
+        return;
+    }
+
+
+    try {
+
+        // -------------------------------------------------
+        // Create anchor directly from hit result
+        // -------------------------------------------------
+
+        if (
+            typeof currentHit.createAnchor ===
+            "function"
+        ) {
+
+            cubeAnchor =
+                await currentHit.createAnchor();
+
+
+            status.textContent =
+                "⚓ CUBE ANCHORED!";
+        }
+
+        // -------------------------------------------------
+        // Fallback if hit-result anchors unavailable
+        // -------------------------------------------------
+
+        else {
+
+            status.textContent =
+                "🧊 CUBE PLACED — ANCHOR NOT AVAILABLE";
+        }
+
+
+        // -------------------------------------------------
+        // Immediately place cube
+        // -------------------------------------------------
+
+        const hitPose =
+            currentHit.getPose(
+                localReferenceSpace
+            );
+
+
+        if (hitPose) {
+
+            cube.matrix.fromArray(
+                hitPose.transform.matrix
+            );
+
+
+            cube.visible = true;
+        }
+
+
+        reticle.visible = false;
+
+
+    } catch (error) {
+
+        console.error(
+            "ANCHOR ERROR:",
+            error
+        );
+
+
+        status.textContent =
+            "❌ Anchor error: " +
+            error.message;
+    }
+}
+
+
+// =====================================================
+// SESSION END
+// =====================================================
+
+function handleSessionEnd() {
+
+    if (renderer) {
+
+        renderer.setAnimationLoop(
+            null
+        );
+    }
+
+
+    if (cubeAnchor) {
+
+        try {
+
+            cubeAnchor.delete();
+
+        } catch (error) {
+
+            console.warn(error);
+        }
+    }
+
+
+    cubeAnchor = null;
+
+    xrSession = null;
+
+    hitTestSource = null;
+
+    localReferenceSpace = null;
+
+    viewerSpace = null;
+
+    currentHit = null;
+
+
+    if (reticle) {
+
+        reticle.visible = false;
+    }
+
+
+    if (cube) {
+
+        cube.visible = false;
+    }
+
+
+    startButton.style.display =
+        "inline-block";
+
+    startButton.disabled =
+        false;
+
+
+    status.textContent =
+        "AR session ended.";
 }
 
 
